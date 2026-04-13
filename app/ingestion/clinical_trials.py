@@ -11,6 +11,8 @@ import requests
 
 
 API_BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
+SOURCE_SYSTEM = "clinicaltrials.gov"
+SOURCE_API_VERSION = "v2"
 
 PHASE_ORDER = {
     "EARLY_PHASE1": 0,
@@ -61,6 +63,12 @@ class TrialQuery:
     filter_overall_status: str | None = None
     filter_phase: str | None = None
     filter_study_type: str | None = None
+    sponsor_name: str | None = None
+    condition: str | None = None
+    intervention_name: str | None = None
+    intervention_type: str | None = None
+    country: str | None = None
+    has_results: bool | None = None
     page_size: int = 100
     max_pages: int | None = 1
 
@@ -101,6 +109,9 @@ class ClinicalTrialsIngestor:
     def _normalize_text(self, value: str | None) -> str:
         return re.sub(r"\s+", " ", (value or "").strip()).lower()
 
+    def _normalize_list(self, values: list[Any] | None) -> list[Any]:
+        return values or []
+
     def _collect_keywords(self, *parts: Any) -> dict[str, list[str]]:
         corpus = " ".join(str(part) for part in parts if part)
         normalized = self._normalize_text(corpus)
@@ -116,6 +127,91 @@ class ClinicalTrialsIngestor:
             return None
         values = [PHASE_ORDER[p] for p in phases if p in PHASE_ORDER]
         return max(values) if values else None
+
+    def _infer_date_precision(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            return "day"
+        if re.fullmatch(r"\d{4}-\d{2}", value):
+            return "month"
+        if re.fullmatch(r"\d{4}", value):
+            return "year"
+        return "unknown"
+
+    def _choose_event_date(
+        self,
+        status_module: dict[str, Any],
+    ) -> tuple[str | None, str | None]:
+        candidates = [
+            ("primary_completion_date", (status_module.get("primaryCompletionDateStruct") or {}).get("date")),
+            ("completion_date", (status_module.get("completionDateStruct") or {}).get("date")),
+            ("results_first_posted", (status_module.get("resultsFirstPostDateStruct") or {}).get("date")),
+            ("last_update_posted", (status_module.get("lastUpdatePostDateStruct") or {}).get("date")),
+        ]
+        for source, value in candidates:
+            if value:
+                return value, source
+        return None, None
+
+    def _compute_completeness_flags(self, record: dict[str, Any]) -> dict[str, Any]:
+        flags = {
+            "has_sponsor": bool(record.get("sponsor_name")),
+            "has_primary_outcomes": bool(record.get("primary_outcomes")),
+            "has_secondary_outcomes": bool(record.get("secondary_outcomes")),
+            "has_locations": bool(record.get("locations")),
+            "has_interventions": bool(record.get("interventions")),
+            "has_reference_support": bool(record.get("references")),
+            "has_eligibility": bool(record.get("eligibility_criteria")),
+            "has_event_date": bool(record.get("event_date_candidate")),
+            "has_results_flag": bool(record.get("has_results")),
+        }
+        total_flags = len(flags)
+        score = sum(1 for value in flags.values() if value)
+        flags["data_completeness_score"] = score
+        flags["data_completeness_ratio"] = round(score / max(total_flags, 1), 3)
+        return flags
+
+    def _post_filter_record(self, record: dict[str, Any], query: TrialQuery) -> bool:
+        if query.sponsor_name and self._normalize_text(query.sponsor_name) not in self._normalize_text(record.get("sponsor_name")):
+            return False
+        if query.condition:
+            normalized_condition = self._normalize_text(query.condition)
+            haystack = " ".join(record.get("conditions") or [])
+            if normalized_condition not in self._normalize_text(haystack):
+                return False
+        if query.intervention_name:
+            normalized_intervention = self._normalize_text(query.intervention_name)
+            haystack = " ".join(record.get("intervention_names") or [])
+            if normalized_intervention not in self._normalize_text(haystack):
+                return False
+        if query.intervention_type:
+            normalized_type = self._normalize_text(query.intervention_type)
+            types = [self._normalize_text(item) for item in (record.get("intervention_types") or [])]
+            if normalized_type not in types:
+                return False
+        if query.country:
+            normalized_country = self._normalize_text(query.country)
+            countries = [self._normalize_text(item.get("country")) for item in (record.get("locations") or []) if item.get("country")]
+            if normalized_country not in countries:
+                return False
+        if query.has_results is not None and bool(record.get("has_results")) != query.has_results:
+            return False
+        return True
+
+    def _dedupe_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        deduped: dict[str, dict[str, Any]] = {}
+        for record in records:
+            key = record.get("nct_id") or record.get("requested_nct_id")
+            if not key:
+                continue
+            current = deduped.get(key)
+            if current is None:
+                deduped[key] = record
+                continue
+            if (record.get("data_completeness_score") or 0) >= (current.get("data_completeness_score") or 0):
+                deduped[key] = record
+        return list(deduped.values())
 
     def _extract_locations(self, contacts_locations: dict[str, Any]) -> list[dict[str, Any]]:
         locations = []
@@ -212,6 +308,7 @@ class ClinicalTrialsIngestor:
         location_rows = self._extract_locations(contacts_locations)
         country_counts = self._country_counts(location_rows)
         reference_rows = self._extract_references(references)
+        event_date_candidate, event_date_source = self._choose_event_date(status)
 
         conditions_list = conditions.get("conditions", [])
         keyword_hits = self._collect_keywords(
@@ -280,10 +377,9 @@ class ClinicalTrialsIngestor:
             "study_first_posted": (status.get("studyFirstPostDateStruct") or {}).get("date"),
             "results_first_posted": (status.get("resultsFirstPostDateStruct") or {}).get("date"),
             "last_update_posted": (status.get("lastUpdatePostDateStruct") or {}).get("date"),
-            "event_date_candidate": (status.get("primaryCompletionDateStruct") or {}).get("date")
-            or (status.get("completionDateStruct") or {}).get("date")
-            or (status.get("resultsFirstPostDateStruct") or {}).get("date")
-            or (status.get("lastUpdatePostDateStruct") or {}).get("date"),
+            "event_date_candidate": event_date_candidate,
+            "event_date_source": event_date_source,
+            "event_date_precision": self._infer_date_precision(event_date_candidate),
             "locations": location_rows,
             "location_count": len(location_rows),
             "country_counts": country_counts,
@@ -296,7 +392,11 @@ class ClinicalTrialsIngestor:
             "central_contacts": contacts_locations.get("centralContacts", []),
             "overall_officials": contacts_locations.get("overallOfficials", []),
             "ipd_sharing": (protocol.get("ipdSharingStatementModule") or {}).get("ipdSharing"),
+            "source_system": SOURCE_SYSTEM,
+            "source_api_version": SOURCE_API_VERSION,
         }
+
+        record.update(self._compute_completeness_flags(record))
 
         if include_raw:
             record["raw_study"] = study
@@ -323,8 +423,9 @@ class ClinicalTrialsIngestor:
 
     def build_search_params(self, query: TrialQuery) -> dict[str, Any]:
         params: dict[str, Any] = {"pageSize": max(1, min(query.page_size, 1000))}
-        if query.query_term:
-            params["query.term"] = query.query_term
+        term_parts = [item for item in [query.query_term, query.sponsor_name, query.condition, query.intervention_name] if item]
+        if term_parts:
+            params["query.term"] = " ".join(term_parts)
         if query.filter_overall_status:
             params["filter.overallStatus"] = query.filter_overall_status
         if query.filter_phase:
@@ -343,12 +444,6 @@ class ClinicalTrialsIngestor:
         records: list[dict[str, Any]] = []
         page_token: str | None = None
         page_count = 0
-        writer = None
-
-        if output_path:
-            output_file = Path(output_path)
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            writer = output_file.open("w", encoding="utf-8")
 
         try:
             while True:
@@ -359,9 +454,9 @@ class ClinicalTrialsIngestor:
                 payload = self._get_json(self.base_url, params=request_params)
                 for study in payload.get("studies", []):
                     record = self.extract_trial_record(study, include_raw=include_raw)
+                    if not self._post_filter_record(record, query):
+                        continue
                     records.append(record)
-                    if writer:
-                        writer.write(json.dumps(record, ensure_ascii=True) + "\n")
 
                 page_count += 1
                 page_token = payload.get("nextPageToken")
@@ -371,11 +466,10 @@ class ClinicalTrialsIngestor:
                     break
         except requests.RequestException as exc:
             raise RuntimeError(f"ClinicalTrials.gov pagination failed: {exc}") from exc
-        finally:
-            if writer:
-                writer.close()
-
-        return records
+        deduped_records = self._dedupe_records(records)
+        if output_path:
+            self.export_records(deduped_records, output_path)
+        return deduped_records
 
     def fetch_multiple_trials(
         self,
@@ -389,6 +483,39 @@ class ClinicalTrialsIngestor:
             except Exception as exc:
                 results.append({"requested_nct_id": nct_id, "error": str(exc)})
         return results
+
+    def summarize_record(self, record: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "nct_id": record.get("nct_id"),
+            "brief_title": record.get("brief_title"),
+            "sponsor_name": record.get("sponsor_name"),
+            "overall_status": record.get("overall_status"),
+            "phase_label": record.get("phase_label"),
+            "therapeutic_area": record.get("therapeutic_area"),
+            "enrollment_count": record.get("enrollment_count"),
+            "event_date_candidate": record.get("event_date_candidate"),
+            "event_date_source": record.get("event_date_source"),
+            "has_results": record.get("has_results"),
+            "data_completeness_score": record.get("data_completeness_score"),
+        }
+
+    def export_records(
+        self,
+        records: list[dict[str, Any]],
+        output_path: str,
+        format: str = "jsonl",
+    ) -> None:
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        format = format.lower()
+        if format not in {"json", "jsonl"}:
+            raise ValueError("format must be 'json' or 'jsonl'")
+        if format == "json":
+            output_file.write_text(json.dumps(records, indent=2, ensure_ascii=True), encoding="utf-8")
+            return
+        with output_file.open("w", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(json.dumps(record, ensure_ascii=True) + "\n")
 
 
 BiologicalDataIngestor = ClinicalTrialsIngestor
@@ -407,9 +534,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("--status")
     search_parser.add_argument("--phase")
     search_parser.add_argument("--study-type")
+    search_parser.add_argument("--sponsor")
+    search_parser.add_argument("--condition")
+    search_parser.add_argument("--intervention")
+    search_parser.add_argument("--intervention-type")
+    search_parser.add_argument("--country")
+    search_parser.add_argument("--has-results", action="store_true")
+    search_parser.add_argument("--without-results", action="store_true")
     search_parser.add_argument("--page-size", type=int, default=25)
     search_parser.add_argument("--pages", type=int, default=1)
     search_parser.add_argument("--out")
+    search_parser.add_argument("--out-format", default="jsonl")
     search_parser.add_argument("--raw", action="store_true")
 
     return parser
@@ -426,18 +561,33 @@ def main() -> None:
         return
 
     if args.command == "search":
+        has_results = None
+        if args.has_results and args.without_results:
+            raise ValueError("Choose only one of --has-results or --without-results")
+        if args.has_results:
+            has_results = True
+        elif args.without_results:
+            has_results = False
         result = ingestor.search_trials(
             TrialQuery(
                 query_term=args.query,
                 filter_overall_status=args.status,
                 filter_phase=args.phase,
                 filter_study_type=args.study_type,
+                sponsor_name=args.sponsor,
+                condition=args.condition,
+                intervention_name=args.intervention,
+                intervention_type=args.intervention_type,
+                country=args.country,
+                has_results=has_results,
                 page_size=args.page_size,
                 max_pages=args.pages,
             ),
             output_path=args.out,
             include_raw=args.raw,
         )
+        if args.out and args.out_format != "jsonl":
+            ingestor.export_records(result, args.out, format=args.out_format)
         print(json.dumps(result, indent=2, ensure_ascii=True))
         return
 
