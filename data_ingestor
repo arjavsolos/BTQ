@@ -1,403 +1,59 @@
-from __future__ import annotations
-
-import argparse
-import json
-import re
-import unicodedata
-from pathlib import Path
-from typing import Any
-
 import requests
 
-
 class BiologicalDataIngestor:
-    """
-    Pulls structured study data from ClinicalTrials.gov and adds a few
-    enrichment helpers that match the architecture you described.
-    """
-
-    def __init__(
-        self,
-        use_env_proxy: bool = False,
-        timeout: int = 30,
-        user_agent: str = "BTQ StochasticRiskModel/1.0 (research prototype)",
-    ) -> None:
+    def __init__(self, use_env_proxy=False, timeout=30):
+        # The base URL for the new ClinicalTrials.gov API v2
         self.ctg_base_url = "https://clinicaltrials.gov/api/v2/studies"
-        self.fda_base_url = "https://api.fda.gov/drug/label.json"
-        self.sec_company_tickers_url = "https://www.sec.gov/files/company_tickers.json"
         self.timeout = timeout
         self.session = requests.Session()
+
+        # Some local environments export broken proxy variables. By default
+        # we bypass those so direct API calls still work.
         self.session.trust_env = use_env_proxy
-        self.session.headers.update(
-            {
-                "Accept": "application/json",
-                "User-Agent": user_agent,
-            }
-        )
-        self._sec_company_cache: list[dict[str, Any]] | None = None
 
-    def _get_json(
-        self,
-        url: str,
-        params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        response = self.session.get(
-            url,
-            params=params,
-            headers=headers,
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        return response.json()
+    def fetch_trial_data(self, nct_id):
+        """Scrapes ClinicalTrials.gov for specific trial features."""
 
-    def _normalize_company_name(self, value: str) -> str:
-        normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
-        normalized = normalized.upper()
-        normalized = normalized.replace("&", " AND ")
-        normalized = re.sub(r"[^A-Z0-9\s]", " ", normalized)
-        normalized = re.sub(
-            r"\b(CORPORATION|CORP|INCORPORATED|INC|LIMITED|LTD|LLC|LP|PLC|CO|COMPANY|HOLDINGS|HOLDING)\b",
-            " ",
-            normalized,
-        )
-        normalized = re.sub(r"\s+", " ", normalized).strip()
-        return normalized
-
-    def _load_sec_company_tickers(self) -> list[dict[str, Any]]:
-        if self._sec_company_cache is not None:
-            return self._sec_company_cache
-
-        payload = self._get_json(
-            self.sec_company_tickers_url,
-            headers={"User-Agent": self.session.headers["User-Agent"]},
-        )
-
-        entries: list[dict[str, Any]] = []
-        for item in payload.values():
-            entries.append(
-                {
-                    "ticker": item.get("ticker"),
-                    "title": item.get("title"),
-                    "cik": str(item.get("cik_str", "")).zfill(10),
-                    "normalized_title": self._normalize_company_name(item.get("title", "")),
-                }
-            )
-
-        self._sec_company_cache = entries
-        return entries
-
-    def extract_trial_features(
-        self,
-        study: dict[str, Any],
-        requested_nct_id: str | None = None,
-        include_raw_protocol: bool = False,
-    ) -> dict[str, Any]:
-        protocol = study.get("protocolSection", {})
-        identification = protocol.get("identificationModule", {})
-        status = protocol.get("statusModule", {})
-        design = protocol.get("designModule", {})
-        conditions = protocol.get("conditionsModule", {})
-        sponsor = protocol.get("sponsorCollaboratorsModule", {})
-        interventions = protocol.get("armsInterventionsModule", {})
-        outcomes = protocol.get("outcomesModule", {})
-
-        lead_sponsor = sponsor.get("leadSponsor", {})
-        organization = identification.get("organization", {})
-        enrollment_info = design.get("enrollmentInfo", {})
-
-        intervention_names = [
-            item.get("name")
-            for item in interventions.get("interventions", [])
-            if item.get("name")
-        ]
-        intervention_types = [
-            item.get("type")
-            for item in interventions.get("interventions", [])
-            if item.get("type")
-        ]
-        primary_endpoints = [
-            item.get("measure")
-            for item in outcomes.get("primaryOutcomes", [])
-            if item.get("measure")
-        ]
-
-        actual_nct_id = identification.get("nctId")
-
-        record = {
-            "requested_nct_id": requested_nct_id or actual_nct_id,
-            "resolved_nct_id": actual_nct_id,
-            "nct_aliases": identification.get("nctIdAliases", []),
-            "brief_title": identification.get("briefTitle"),
-            "official_title": identification.get("officialTitle"),
-            "sponsor_name": lead_sponsor.get("name") or organization.get("fullName"),
-            "sponsor_class": lead_sponsor.get("class") or organization.get("class"),
-            "overall_status": status.get("overallStatus"),
-            "study_type": design.get("studyType"),
-            "phases": design.get("phases", []),
-            "phase": ", ".join(design.get("phases", [])) if design.get("phases") else None,
-            "conditions": conditions.get("conditions", []),
-            "therapeutic_area": conditions.get("conditions", [None])[0],
-            "enrollment_target": enrollment_info.get("count"),
-            "enrollment_type": enrollment_info.get("type"),
-            "interventions": intervention_names,
-            "intervention_types": intervention_types,
-            "primary_endpoints": primary_endpoints,
-            "start_date": (status.get("startDateStruct") or {}).get("date"),
-            "primary_completion_date": (status.get("primaryCompletionDateStruct") or {}).get("date"),
-            "completion_date": (status.get("completionDateStruct") or {}).get("date"),
-            "last_update_posted": (status.get("lastUpdatePostDateStruct") or {}).get("date"),
-        }
-        if include_raw_protocol:
-            record["raw_protocol_section"] = protocol
-        return record
-
-    def fetch_trial_data(
-        self,
-        nct_id: str,
-        include_raw: bool = False,
-        include_raw_protocol: bool = False,
-    ) -> dict[str, Any]:
-        """
-        Fetch one study by NCT ID and return either the raw API payload or a
-        flattened feature set that is easier to store downstream.
-        """
-
+        # 1. We build the exact web address for the specific trial
         url = f"{self.ctg_base_url}/{nct_id}"
+        print(f"Connecting to: {url}...")
+
         try:
-            payload = self._get_json(url)
-        except requests.HTTPError as exc:
-            status_code = exc.response.status_code if exc.response is not None else "unknown"
-            if status_code == 404:
-                raise ValueError(
-                    f"Study '{nct_id}' was not found on ClinicalTrials.gov."
-                ) from exc
-            raise RuntimeError(
-                f"ClinicalTrials.gov request failed with status {status_code}."
-            ) from exc
+            # 2. We 'GET' the data from the internet
+            response = self.session.get(url, timeout=self.timeout)
         except requests.RequestException as exc:
-            raise RuntimeError(f"ClinicalTrials.gov request failed: {exc}") from exc
-
-        if include_raw:
-            return payload
-        return self.extract_trial_features(
-            payload,
-            requested_nct_id=nct_id,
-            include_raw_protocol=include_raw_protocol,
-        )
-
-    def ingest_trials(
-        self,
-        query_term: str | None = None,
-        page_size: int = 100,
-        max_pages: int | None = 1,
-        output_path: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """
-        Paginate through the ClinicalTrials.gov studies endpoint and flatten
-        each result into a storage-friendly dictionary.
-        """
-
-        params: dict[str, Any] = {"pageSize": max(1, min(page_size, 1000))}
-        if query_term:
-            params["query.term"] = query_term
-
-        page_token: str | None = None
-        page_count = 0
-        records: list[dict[str, Any]] = []
-        writer = None
-
-        if output_path:
-            output_file = Path(output_path)
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            writer = output_file.open("w", encoding="utf-8")
-
-        try:
-            while True:
-                request_params = dict(params)
-                if page_token:
-                    request_params["pageToken"] = page_token
-
-                payload = self._get_json(self.ctg_base_url, params=request_params)
-                studies = payload.get("studies", [])
-
-                for study in studies:
-                    record = self.extract_trial_features(study)
-                    records.append(record)
-                    if writer:
-                        writer.write(json.dumps(record, ensure_ascii=True) + "\n")
-
-                page_count += 1
-                page_token = payload.get("nextPageToken")
-
-                if not page_token:
-                    break
-                if max_pages is not None and page_count >= max_pages:
-                    break
-        except requests.RequestException as exc:
-            raise RuntimeError(f"ClinicalTrials.gov pagination failed: {exc}") from exc
-        finally:
-            if writer:
-                writer.close()
-
-        return records
-
-    def map_sponsor_to_ticker(self, sponsor_name: str) -> dict[str, Any] | None:
-        """
-        Best-effort entity resolution against the SEC company ticker dataset.
-        Returns None if no confident match is found.
-        """
-
-        if not sponsor_name:
+            print(f"Network error while fetching data: {exc}")
             return None
 
-        normalized_target = self._normalize_company_name(sponsor_name)
-        if not normalized_target:
+        # 3. HTTP Status 200 means "Success OK".
+        if response.status_code == 200:
+            # The data comes back as JSON (a nested dictionary)
+            return response.json()
+
+        if response.status_code == 404:
+            print(
+                f"Study '{nct_id}' was not found. "
+                "Double-check the NCT ID."
+            )
             return None
 
-        try:
-            companies = self._load_sec_company_tickers()
-        except requests.RequestException:
-            return None
-
-        exact_match = next(
-            (item for item in companies if item["normalized_title"] == normalized_target),
-            None,
-        )
-        if exact_match:
-            return exact_match
-
-        target_tokens = set(normalized_target.split())
-        best_match = None
-        best_overlap = 0.0
-
-        for company in companies:
-            candidate = company["normalized_title"]
-            if not candidate:
-                continue
-            candidate_tokens = set(candidate.split())
-            overlap = len(target_tokens & candidate_tokens) / max(len(target_tokens), 1)
-            if overlap > best_overlap:
-                best_overlap = overlap
-                best_match = company
-
-        if best_match and best_overlap >= 0.75:
-            return {**best_match, "match_score": round(best_overlap, 3)}
-
+        print(f"Failed to fetch data. Error Code: {response.status_code}")
         return None
 
-    def fetch_fda_base_rates(
-        self,
-        therapeutic_area: str,
-        limit: int = 10,
-    ) -> dict[str, Any]:
-        """
-        Pull a quick OpenFDA snapshot for a therapeutic-area search term.
-        This is a practical building block for your Bayesian priors, not the
-        full final LOA model.
-        """
-
-        if not therapeutic_area:
-            raise ValueError("therapeutic_area is required")
-
-        query = f'indications_and_usage:"{therapeutic_area}"'
-        params = {
-            "search": query,
-            "limit": max(1, min(limit, 100)),
-        }
-
-        try:
-            payload = self._get_json(self.fda_base_url, params=params)
-        except requests.HTTPError as exc:
-            status_code = exc.response.status_code if exc.response is not None else "unknown"
-            raise RuntimeError(f"OpenFDA request failed with status {status_code}.") from exc
-        except requests.RequestException as exc:
-            raise RuntimeError(f"OpenFDA request failed: {exc}") from exc
-
-        results = payload.get("results", [])
-        total = payload.get("meta", {}).get("results", {}).get("total")
-
-        samples = []
-        for item in results:
-            openfda = item.get("openfda", {})
-            samples.append(
-                {
-                    "brand_name": (openfda.get("brand_name") or [None])[0],
-                    "generic_name": (openfda.get("generic_name") or [None])[0],
-                    "manufacturer_name": (openfda.get("manufacturer_name") or [None])[0],
-                }
-            )
-
-        return {
-            "therapeutic_area": therapeutic_area,
-            "search_query": query,
-            "matching_label_count": total,
-            "sample_records": samples,
-        }
-
-
-def build_argument_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Clinical and FDA data ingestor")
-    subparsers = parser.add_subparsers(dest="command")
-
-    trial_parser = subparsers.add_parser("trial", help="Fetch one study by NCT ID")
-    trial_parser.add_argument("nct_id")
-    trial_parser.add_argument("--raw", action="store_true")
-    trial_parser.add_argument("--raw-protocol", action="store_true")
-
-    search_parser = subparsers.add_parser("search", help="Paginate through studies")
-    search_parser.add_argument("--query", dest="query_term")
-    search_parser.add_argument("--page-size", type=int, default=25)
-    search_parser.add_argument("--pages", type=int, default=1)
-    search_parser.add_argument("--out")
-
-    sponsor_parser = subparsers.add_parser("ticker", help="Map a sponsor name to an SEC ticker")
-    sponsor_parser.add_argument("sponsor_name")
-
-    fda_parser = subparsers.add_parser("fda", help="Search OpenFDA by therapeutic area")
-    fda_parser.add_argument("therapeutic_area")
-    fda_parser.add_argument("--limit", type=int, default=10)
-
-    return parser
-
-
-def main() -> None:
-    parser = build_argument_parser()
-    args = parser.parse_args()
+# --- Testing Our Detective ---
+if __name__ == '__main__':
+    # Instantiate the class
     ingestor = BiologicalDataIngestor()
 
-    if args.command == "trial":
-        result = ingestor.fetch_trial_data(
-            args.nct_id,
-            include_raw=args.raw,
-            include_raw_protocol=args.raw_protocol,
-        )
-        print(json.dumps(result, indent=2, ensure_ascii=True))
-        return
+    # Use a known-valid example study ID for the demo run.
+    test_nct_id = "NCT00276653"
 
-    if args.command == "search":
-        result = ingestor.ingest_trials(
-            query_term=args.query_term,
-            page_size=args.page_size,
-            max_pages=args.pages,
-            output_path=args.out,
-        )
-        print(json.dumps(result, indent=2, ensure_ascii=True))
-        return
+    # Run our function
+    trial_data = ingestor.fetch_trial_data(test_nct_id)
 
-    if args.command == "ticker":
-        result = ingestor.map_sponsor_to_ticker(args.sponsor_name)
-        print(json.dumps(result, indent=2, ensure_ascii=True))
-        return
-
-    if args.command == "fda":
-        result = ingestor.fetch_fda_base_rates(args.therapeutic_area, limit=args.limit)
-        print(json.dumps(result, indent=2, ensure_ascii=True))
-        return
-
-    demo_result = ingestor.fetch_trial_data("NCT00276653")
-    print(json.dumps(demo_result, indent=2, ensure_ascii=True))
-
-
-if __name__ == "__main__":
-    main()
+    # If it worked, let's drill into the dictionary and print the title
+    if trial_data:
+        print("\nSuccess! We intercepted the data.")
+        # JSON data is heavily nested. We are digging down to find the title.
+        title = trial_data['protocolSection']['identificationModule']['briefTitle']
+        print(f"Trial Title: {title}")
