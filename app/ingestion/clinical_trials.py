@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -83,9 +84,13 @@ class ClinicalTrialsIngestor:
         use_env_proxy: bool = False,
         timeout: int = 30,
         user_agent: str = "BTQ ClinicalTrials Ingestor/1.0",
+        max_retries: int = 3,
+        retry_backoff_seconds: float = 1.25,
     ) -> None:
         self.base_url = API_BASE_URL
         self.timeout = timeout
+        self.max_retries = max(1, max_retries)
+        self.retry_backoff_seconds = max(0.0, retry_backoff_seconds)
         self.session = requests.Session()
         self.session.trust_env = use_env_proxy
         self.session.headers.update(
@@ -96,9 +101,31 @@ class ClinicalTrialsIngestor:
         )
 
     def _get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        response = self.session.get(url, params=params, timeout=self.timeout)
-        response.raise_for_status()
-        return response.json()
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = self.session.get(url, params=params, timeout=self.timeout)
+                if response.status_code in {429, 500, 502, 503, 504} and attempt < self.max_retries:
+                    retry_after = response.headers.get("Retry-After")
+                    sleep_seconds = float(retry_after) if retry_after and retry_after.isdigit() else self.retry_backoff_seconds * attempt
+                    time.sleep(sleep_seconds)
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except requests.HTTPError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                if status_code not in {429, 500, 502, 503, 504}:
+                    raise
+                last_error = exc
+                if attempt >= self.max_retries:
+                    break
+                time.sleep(self.retry_backoff_seconds * attempt)
+            except (ValueError, requests.RequestException) as exc:
+                last_error = exc
+                if attempt >= self.max_retries:
+                    break
+                time.sleep(self.retry_backoff_seconds * attempt)
+        raise RuntimeError(f"ClinicalTrials.gov request failed after {self.max_retries} attempts: {last_error}") from last_error
 
     def _coerce_int(self, value: Any) -> int | None:
         try:
