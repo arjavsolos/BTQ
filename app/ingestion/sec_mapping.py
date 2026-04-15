@@ -5,7 +5,7 @@ import json
 import os
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -225,7 +225,7 @@ def main() -> None:
     if args.refresh:
         mapper.refresh_registry(force=True)
     result = mapper.match_sponsor_to_ticker(args.sponsor_name, minimum_confidence=args.minimum_confidence)
-    print(json.dumps(result.__dict__, indent=2, ensure_ascii=True))
+    print(json.dumps(asdict(result), indent=2, ensure_ascii=True))
 
 
 if __name__ == "__main__":
