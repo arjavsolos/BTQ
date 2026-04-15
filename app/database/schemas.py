@@ -66,7 +66,7 @@ create table if not exists clinical_trials (
   location_count integer,
   country_counts jsonb,
   us_site_count integer,
-  references jsonb,
+  trial_references jsonb,
   reference_count integer,
   see_also_links jsonb,
   keyword_hits jsonb,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import quote_plus
 
@@ -26,17 +27,60 @@ class DatabaseSettings:
 
 
 _POOL: Any | None = None
+_DLL_PATH_INITIALIZED = False
+
+
+def _initialize_windows_postgres_dll_path() -> None:
+    global _DLL_PATH_INITIALIZED
+    if _DLL_PATH_INITIALIZED or os.name != "nt":
+        return
+
+    candidate_dirs = []
+
+    env_bin = os.getenv("POSTGRES_BIN_DIR")
+    if env_bin:
+        candidate_dirs.append(Path(env_bin))
+
+    program_files = os.getenv("ProgramFiles")
+    if program_files:
+        postgres_root = Path(program_files) / "PostgreSQL"
+        if postgres_root.exists():
+            versions = sorted(
+                [path for path in postgres_root.iterdir() if path.is_dir()],
+                reverse=True,
+            )
+            for version_dir in versions:
+                candidate_dirs.append(version_dir / "bin")
+
+    for candidate in candidate_dirs:
+        if not candidate.exists():
+            continue
+        try:
+            os.add_dll_directory(str(candidate))
+            current_path = os.environ.get("PATH", "")
+            if str(candidate) not in current_path:
+                os.environ["PATH"] = f"{candidate}{os.pathsep}{current_path}"
+            _DLL_PATH_INITIALIZED = True
+            return
+        except (FileNotFoundError, OSError):
+            continue
 
 
 def _import_postgres_driver() -> tuple[Any, str]:
+    _initialize_windows_postgres_dll_path()
     try:
         import psycopg  # type: ignore
 
         return psycopg, "psycopg"
     except ImportError:
-        import psycopg2  # type: ignore
+        try:
+            import psycopg2  # type: ignore
 
-        return psycopg2, "psycopg2"
+            return psycopg2, "psycopg2"
+        except ImportError:
+            import pg8000  # type: ignore
+
+            return pg8000, "pg8000"
 
 
 class DatabaseConfigError(RuntimeError):
@@ -100,11 +144,21 @@ def _build_connect_kwargs(settings: DatabaseSettings) -> dict[str, Any]:
 def create_connection(autocommit: bool = False) -> Any:
     driver, driver_name = _import_postgres_driver()
     settings = get_database_settings()
-    connection = driver.connect(settings.database_url, **_build_connect_kwargs(settings))
+    if driver_name == "pg8000":
+        connection = driver.connect(
+            host=os.getenv("DB_HOST", "localhost"),
+            port=int(os.getenv("DB_PORT", "5432")),
+            database=os.getenv("DB_NAME", "postgres"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            timeout=settings.connect_timeout,
+        )
+    else:
+        connection = driver.connect(settings.database_url, **_build_connect_kwargs(settings))
 
     if driver_name == "psycopg":
         connection.autocommit = autocommit
-    else:
+    elif driver_name == "psycopg2":
         connection.autocommit = autocommit
 
     return connection

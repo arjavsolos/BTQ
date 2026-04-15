@@ -27,12 +27,16 @@ JSON_FIELDS = {
     "std_ages",
     "locations",
     "country_counts",
-    "references",
+    "trial_references",
     "see_also_links",
     "keyword_hits",
     "derived_misc_info",
     "central_contacts",
     "overall_officials",
+}
+
+COLUMN_SOURCE_MAP = {
+    "trial_references": "references",
 }
 
 
@@ -100,7 +104,7 @@ TRIAL_COLUMNS = [
     "location_count",
     "country_counts",
     "us_site_count",
-    "references",
+    "trial_references",
     "reference_count",
     "see_also_links",
     "keyword_hits",
@@ -133,6 +137,11 @@ def _serialize_value(column: str, value: Any) -> Any:
     return value
 
 
+def _record_value(trial_record: dict[str, Any], column: str) -> Any:
+    source_key = COLUMN_SOURCE_MAP.get(column, column)
+    return trial_record.get(source_key)
+
+
 class ClinicalTrialsRepository:
     def __init__(self, connection: Any) -> None:
         self.connection = connection
@@ -149,7 +158,7 @@ class ClinicalTrialsRepository:
         update_assignments = ", ".join(
             f"{column} = excluded.{column}" for column in TRIAL_COLUMNS if column != "nct_id"
         )
-        values = [_serialize_value(column, trial_record.get(column)) for column in TRIAL_COLUMNS]
+        values = [_serialize_value(column, _record_value(trial_record, column)) for column in TRIAL_COLUMNS]
 
         sql = f"""
         insert into clinical_trials ({insert_columns})
