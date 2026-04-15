@@ -126,7 +126,10 @@ TRIAL_COLUMNS = [
 
 def _serialize_value(column: str, value: Any) -> Any:
     if column in JSON_FIELDS:
-        return json.dumps(value if value is not None else [])
+        if value is None:
+            default_value = {} if column in {"responsible_party", "country_counts", "keyword_hits", "derived_misc_info"} else []
+            return json.dumps(default_value)
+        return json.dumps(value)
     return value
 
 
