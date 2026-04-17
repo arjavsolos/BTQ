@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+import unittest
+from dataclasses import dataclass
+
+from app.services.trial_analysis_service import TrialAnalysisService
+
+
+class _ClinicalStub:
+    def fetch_trial_data(self, nct_id: str, include_raw: bool = False) -> dict:
+        return {
+            "nct_id": nct_id,
+            "brief_title": "Example Trial",
+            "sponsor_name": "Pfizer Inc",
+            "phase_label": "PHASE3",
+            "overall_status": "COMPLETED",
+            "therapeutic_area": "Oncology",
+            "event_date_candidate": "2025-01-15",
+            "event_date_source": "primary_completion_date",
+        }
+
+
+class _SecStub:
+    def match_sponsor_to_ticker(self, sponsor_name: str):
+        @dataclass(slots=True)
+        class Result:
+            sponsor_name: str
+            matched_company_name: str | None
+            ticker: str | None
+            cik: str | None
+            confidence: float
+            match_type: str
+            alternatives: list[dict]
+
+        return Result(
+            sponsor_name=sponsor_name,
+            matched_company_name="PFIZER INC",
+            ticker="PFE",
+            cik="0000078003",
+            confidence=1.0,
+            match_type="exact_normalized",
+            alternatives=[],
+        )
+
+
+class _OpenFDAStub:
+    def fetch_approval_snapshot(self, sponsor_name: str | None = None, search: str | None = None, limit: int = 25):
+        return [{"application_number": "NDA000001", "sponsor_name": sponsor_name}]
+
+
+class _MarketStub:
+    def summarize_event_reaction(self, ticker: str, event_date: str, pre_days: int = 5, post_days: int = 5):
+        return {
+            "ticker": ticker,
+            "event_date": event_date,
+            "record_count": 10,
+            "event_day_return": 0.123,
+            "post_window_return": 0.045,
+        }
+
+
+class TrialAnalysisServiceTests(unittest.TestCase):
+    def test_analyze_trial_returns_joined_output(self) -> None:
+        service = TrialAnalysisService(
+            clinical_trials_ingestor=_ClinicalStub(),
+            sec_mapper=_SecStub(),
+            openfda_ingestor=_OpenFDAStub(),
+            market_data_ingestor=_MarketStub(),
+        )
+
+        result = service.analyze_trial("NCT00000001")
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["summary"]["mapped_ticker"], "PFE")
+        self.assertEqual(result["fda_context"]["approval_record_count"], 1)
+        self.assertEqual(result["market_data"]["event_day_return"], 0.123)
+        self.assertEqual(result["warnings"], [])
+
+
+if __name__ == "__main__":
+    unittest.main()

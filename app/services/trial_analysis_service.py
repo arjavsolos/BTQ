@@ -1,0 +1,208 @@
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from app.ingestion import (
+    ClinicalTrialsIngestor,
+    MarketDataIngestor,
+    OpenFDAIngestor,
+    SecCompanyMapper,
+)
+
+
+DAY_PRECISION_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+class TrialAnalysisService:
+    """
+    Orchestrates one end-to-end trial analysis across the ingestion layer.
+    """
+
+    def __init__(
+        self,
+        clinical_trials_ingestor: ClinicalTrialsIngestor | None = None,
+        sec_mapper: SecCompanyMapper | None = None,
+        openfda_ingestor: OpenFDAIngestor | None = None,
+        market_data_ingestor: MarketDataIngestor | None = None,
+    ) -> None:
+        self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
+        self.sec_mapper = sec_mapper or SecCompanyMapper()
+        self.openfda_ingestor = openfda_ingestor or OpenFDAIngestor()
+        self.market_data_ingestor = market_data_ingestor or MarketDataIngestor()
+
+    def _build_summary(
+        self,
+        trial: dict[str, Any],
+        sponsor_mapping: dict[str, Any] | None,
+        market_summary: dict[str, Any] | None,
+        approval_records: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        return {
+            "nct_id": trial.get("nct_id"),
+            "brief_title": trial.get("brief_title"),
+            "sponsor_name": trial.get("sponsor_name"),
+            "phase_label": trial.get("phase_label"),
+            "overall_status": trial.get("overall_status"),
+            "therapeutic_area": trial.get("therapeutic_area"),
+            "event_date_candidate": trial.get("event_date_candidate"),
+            "event_date_source": trial.get("event_date_source"),
+            "mapped_ticker": None if sponsor_mapping is None else sponsor_mapping.get("ticker"),
+            "mapped_cik": None if sponsor_mapping is None else sponsor_mapping.get("cik"),
+            "approval_record_count": len(approval_records),
+            "market_record_count": None if market_summary is None else market_summary.get("record_count"),
+            "event_day_return": None if market_summary is None else market_summary.get("event_day_return"),
+            "post_window_return": None if market_summary is None else market_summary.get("post_window_return"),
+        }
+
+    def _normalize_sponsor_mapping(self, sponsor_name: str | None) -> tuple[dict[str, Any] | None, list[str]]:
+        warnings: list[str] = []
+        if not sponsor_name:
+            warnings.append("Trial did not include a sponsor name, so ticker mapping was skipped.")
+            return None, warnings
+        try:
+            result = self.sec_mapper.match_sponsor_to_ticker(sponsor_name)
+            mapping = asdict(result)
+            if not mapping.get("ticker"):
+                warnings.append("Sponsor mapping did not produce a confident public ticker match.")
+            return mapping, warnings
+        except Exception as exc:
+            warnings.append(f"SEC sponsor mapping failed: {exc}")
+            return None, warnings
+
+    def _fetch_market_summary(
+        self,
+        ticker: str | None,
+        event_date: str | None,
+        pre_days: int,
+        post_days: int,
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        warnings: list[str] = []
+        if not ticker:
+            warnings.append("No mapped ticker was available, so market data was skipped.")
+            return None, warnings
+        if not event_date:
+            warnings.append("No event date candidate was available, so market data was skipped.")
+            return None, warnings
+        if not DAY_PRECISION_PATTERN.fullmatch(event_date):
+            warnings.append("Event date is not day-precision, so market event-window analysis was skipped.")
+            return None, warnings
+        try:
+            market_summary = self.market_data_ingestor.summarize_event_reaction(
+                ticker=ticker,
+                event_date=event_date,
+                pre_days=pre_days,
+                post_days=post_days,
+            )
+            if market_summary.get("error"):
+                warnings.append(str(market_summary["error"]))
+            return market_summary, warnings
+        except Exception as exc:
+            warnings.append(f"Market data fetch failed: {exc}")
+            return None, warnings
+
+    def _fetch_fda_context(
+        self,
+        sponsor_name: str | None,
+        approval_limit: int,
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        warnings: list[str] = []
+        if not sponsor_name:
+            warnings.append("No sponsor name was available, so FDA context was skipped.")
+            return [], warnings
+        try:
+            records = self.openfda_ingestor.fetch_approval_snapshot(
+                sponsor_name=sponsor_name,
+                limit=approval_limit,
+            )
+            if not records:
+                warnings.append("OpenFDA returned no sponsor-linked approval records.")
+            return records, warnings
+        except Exception as exc:
+            warnings.append(f"OpenFDA fetch failed: {exc}")
+            return [], warnings
+
+    def analyze_trial(
+        self,
+        nct_id: str,
+        approval_limit: int = 5,
+        market_pre_days: int = 5,
+        market_post_days: int = 5,
+        include_raw_trial: bool = False,
+    ) -> dict[str, Any]:
+        warnings: list[str] = []
+
+        trial = self.clinical_trials_ingestor.fetch_trial_data(nct_id, include_raw=include_raw_trial)
+        sponsor_mapping, sponsor_warnings = self._normalize_sponsor_mapping(trial.get("sponsor_name"))
+        warnings.extend(sponsor_warnings)
+
+        approval_records, fda_warnings = self._fetch_fda_context(
+            sponsor_name=trial.get("sponsor_name"),
+            approval_limit=approval_limit,
+        )
+        warnings.extend(fda_warnings)
+
+        market_summary, market_warnings = self._fetch_market_summary(
+            ticker=None if sponsor_mapping is None else sponsor_mapping.get("ticker"),
+            event_date=trial.get("event_date_candidate"),
+            pre_days=market_pre_days,
+            post_days=market_post_days,
+        )
+        warnings.extend(market_warnings)
+
+        analysis = {
+            "status": "success",
+            "analysis_type": "single_trial",
+            "summary": self._build_summary(
+                trial=trial,
+                sponsor_mapping=sponsor_mapping,
+                market_summary=market_summary,
+                approval_records=approval_records,
+            ),
+            "trial": trial,
+            "sponsor_mapping": sponsor_mapping,
+            "fda_context": {
+                "approval_record_count": len(approval_records),
+                "approval_records": approval_records,
+            },
+            "market_data": market_summary,
+            "warnings": warnings,
+        }
+        return analysis
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run an end-to-end analysis for one clinical trial")
+    parser.add_argument("nct_id")
+    parser.add_argument("--approval-limit", type=int, default=5)
+    parser.add_argument("--market-pre-days", type=int, default=5)
+    parser.add_argument("--market-post-days", type=int, default=5)
+    parser.add_argument("--include-raw-trial", action="store_true")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+    service = TrialAnalysisService()
+    result = service.analyze_trial(
+        nct_id=args.nct_id,
+        approval_limit=args.approval_limit,
+        market_pre_days=args.market_pre_days,
+        market_post_days=args.market_post_days,
+        include_raw_trial=args.include_raw_trial,
+    )
+    print(json.dumps(result, indent=2, ensure_ascii=True))
+
+
+if __name__ == "__main__":
+    main()
