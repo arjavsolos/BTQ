@@ -1,0 +1,200 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_PYTHON_VERSION_WARNING: "1"
+
+jobs:
+  quality-and-unit-tests:
+    name: Quality And Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Verify Python files compile
+        run: |
+          python -m compileall app scripts tests run.py
+
+      - name: Run unit tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest discover -s tests -p "test_*.py"
+
+  database-integration:
+    name: Database Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - quality-and-unit-tests
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: btq_test
+          POSTGRES_USER: btq
+          POSTGRES_PASSWORD: btq_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U btq -d btq_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      PYTHONPATH: .
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: btq_test
+      DB_USER: btq
+      DB_PASSWORD: btq_password
+      DATABASE_POOL_ENABLED: "false"
+      DATABASE_APPLICATION_NAME: btq-ci
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Initialize database schema
+        run: |
+          python run.py init-db
+
+      - name: Verify database health and schema
+        run: |
+          python - <<'PY'
+          from app.database.connection import check_database_connection, get_connection
+
+          health = check_database_connection()
+          assert health["status"] == "ok", health
+
+          with get_connection() as connection:
+              with connection.cursor() as cursor:
+                  cursor.execute(
+                      "select to_regclass('public.clinical_trials'), to_regclass('public.trial_analyses');"
+                  )
+                  clinical_trials_table, trial_analyses_table = cursor.fetchone()
+
+          assert clinical_trials_table == "clinical_trials", clinical_trials_table
+          assert trial_analyses_table == "trial_analyses", trial_analyses_table
+          print("database_health_ok")
+          PY
+
+      - name: Smoke test repository persistence
+        run: |
+          python - <<'PY'
+          from app.database.connection import get_connection
+          from app.database.repositories import ClinicalTrialsRepository, TrialAnalysisRepository
+
+          trial_record = {
+              "nct_id": "NCTCI000001",
+              "requested_nct_id": "NCTCI000001",
+              "brief_title": "CI Smoke Test Trial",
+              "sponsor_name": "CI Sponsor",
+              "overall_status": "COMPLETED",
+              "phase_label": "PHASE2",
+              "phase_score": 2,
+              "study_type": "INTERVENTIONAL",
+              "therapeutic_area": "Oncology",
+              "event_date_candidate": "2025-01-15",
+              "event_date_source": "primary_completion_date",
+              "event_date_precision": "day",
+              "source_system": "clinicaltrials.gov",
+              "source_api_version": "v2",
+              "has_sponsor": True,
+              "has_primary_outcomes": False,
+              "has_secondary_outcomes": False,
+              "has_locations": False,
+              "has_interventions": False,
+              "has_reference_support": False,
+              "has_eligibility": False,
+              "has_event_date": True,
+              "has_results_flag": False,
+              "data_completeness_score": 3,
+              "data_completeness_ratio": 0.333,
+          }
+
+          analysis_record = {
+              "analysis_version": "ci-smoke",
+              "summary": {
+                  "nct_id": "NCTCI000001",
+                  "mapped_ticker": "CISM",
+                  "mapped_cik": "0000000000",
+                  "sponsor_name": "CI Sponsor",
+                  "event_date_candidate": "2025-01-15",
+                  "event_date_source": "primary_completion_date",
+                  "overall_status": "COMPLETED",
+                  "phase_label": "PHASE2",
+                  "therapeutic_area": "Oncology",
+                  "approval_record_count": 0,
+                  "market_record_count": 0,
+                  "event_day_return": None,
+                  "post_window_return": None,
+              },
+              "trial": {
+                  "requested_nct_id": "NCTCI000001",
+              },
+              "warnings": [],
+          }
+
+          with get_connection() as connection:
+              clinical_trials_repository = ClinicalTrialsRepository(connection)
+              trial_analysis_repository = TrialAnalysisRepository(connection)
+              clinical_trials_repository.upsert_trial(trial_record)
+              analysis_id = trial_analysis_repository.insert_analysis(analysis_record)
+
+              with connection.cursor() as cursor:
+                  cursor.execute("select nct_id from clinical_trials where nct_id = %s;", ("NCTCI000001",))
+                  trial_row = cursor.fetchone()
+                  cursor.execute("select analysis_version from trial_analyses where analysis_id = %s;", (analysis_id,))
+                  analysis_row = cursor.fetchone()
+
+          assert trial_row[0] == "NCTCI000001", trial_row
+          assert analysis_row[0] == "ci-smoke", analysis_row
+          print("repository_persistence_ok")
+          PY
