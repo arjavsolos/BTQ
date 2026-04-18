@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -18,9 +19,12 @@ from app.ingestion import (
     OpenFDAIngestor,
     SecCompanyMapper,
 )
+from app.database.connection import DatabaseConfigError, get_connection
+from app.database.repositories import ClinicalTrialsRepository, TrialAnalysisRepository
 
 
 DAY_PRECISION_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+ANALYSIS_VERSION = "1.0"
 
 
 class TrialAnalysisService:
@@ -34,11 +38,24 @@ class TrialAnalysisService:
         sec_mapper: SecCompanyMapper | None = None,
         openfda_ingestor: OpenFDAIngestor | None = None,
         market_data_ingestor: MarketDataIngestor | None = None,
+        persist_trial_records: bool = True,
     ) -> None:
         self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
         self.sec_mapper = sec_mapper or SecCompanyMapper()
         self.openfda_ingestor = openfda_ingestor or OpenFDAIngestor()
         self.market_data_ingestor = market_data_ingestor or MarketDataIngestor()
+        self.persist_trial_records = persist_trial_records
+
+    def _normalize_warnings(self, warnings: list[str]) -> list[str]:
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for warning in warnings:
+            clean = " ".join((warning or "").split()).strip()
+            if not clean or clean in seen:
+                continue
+            seen.add(clean)
+            deduped.append(clean)
+        return deduped
 
     def _build_summary(
         self,
@@ -49,6 +66,7 @@ class TrialAnalysisService:
     ) -> dict[str, Any]:
         return {
             "nct_id": trial.get("nct_id"),
+            "requested_nct_id": trial.get("requested_nct_id"),
             "brief_title": trial.get("brief_title"),
             "sponsor_name": trial.get("sponsor_name"),
             "phase_label": trial.get("phase_label"),
@@ -62,6 +80,7 @@ class TrialAnalysisService:
             "market_record_count": None if market_summary is None else market_summary.get("record_count"),
             "event_day_return": None if market_summary is None else market_summary.get("event_day_return"),
             "post_window_return": None if market_summary is None else market_summary.get("post_window_return"),
+            "data_completeness_score": trial.get("data_completeness_score"),
         }
 
     def _normalize_sponsor_mapping(self, sponsor_name: str | None) -> tuple[dict[str, Any] | None, list[str]]:
@@ -131,6 +150,19 @@ class TrialAnalysisService:
             warnings.append(f"OpenFDA fetch failed: {exc}")
             return [], warnings
 
+    def _persist_analysis(self, trial: dict[str, Any], analysis: dict[str, Any]) -> int | None:
+        try:
+            with get_connection() as connection:
+                trial_repository = ClinicalTrialsRepository(connection)
+                analysis_repository = TrialAnalysisRepository(connection)
+                trial_repository.create_tables()
+                analysis_repository.create_tables()
+                if self.persist_trial_records and trial.get("nct_id"):
+                    trial_repository.upsert_trial(trial)
+                return analysis_repository.insert_analysis(analysis)
+        except DatabaseConfigError:
+            return None
+
     def analyze_trial(
         self,
         nct_id: str,
@@ -138,6 +170,7 @@ class TrialAnalysisService:
         market_pre_days: int = 5,
         market_post_days: int = 5,
         include_raw_trial: bool = False,
+        save_to_db: bool = False,
     ) -> dict[str, Any]:
         warnings: list[str] = []
 
@@ -158,10 +191,21 @@ class TrialAnalysisService:
             post_days=market_post_days,
         )
         warnings.extend(market_warnings)
+        warnings = self._normalize_warnings(warnings)
 
         analysis = {
             "status": "success",
             "analysis_type": "single_trial",
+            "analysis_version": ANALYSIS_VERSION,
+            "analyzed_at": datetime.now(timezone.utc).isoformat(),
+            "input": {
+                "nct_id": nct_id,
+                "approval_limit": approval_limit,
+                "market_pre_days": market_pre_days,
+                "market_post_days": market_post_days,
+                "include_raw_trial": include_raw_trial,
+                "save_to_db": save_to_db,
+            },
             "summary": self._build_summary(
                 trial=trial,
                 sponsor_mapping=sponsor_mapping,
@@ -177,6 +221,15 @@ class TrialAnalysisService:
             "market_data": market_summary,
             "warnings": warnings,
         }
+        if save_to_db:
+            analysis_id = self._persist_analysis(trial, analysis)
+            if analysis_id is not None:
+                analysis["persistence"] = {"saved": True, "analysis_id": analysis_id}
+            else:
+                analysis["persistence"] = {"saved": False, "analysis_id": None}
+                analysis["warnings"] = self._normalize_warnings(
+                    analysis["warnings"] + ["Analysis could not be persisted because the database was unavailable or not configured."]
+                )
         return analysis
 
 
@@ -187,6 +240,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--market-pre-days", type=int, default=5)
     parser.add_argument("--market-post-days", type=int, default=5)
     parser.add_argument("--include-raw-trial", action="store_true")
+    parser.add_argument("--save", action="store_true")
+    parser.add_argument("--summary-only", action="store_true")
     return parser
 
 
@@ -200,8 +255,10 @@ def main() -> None:
         market_pre_days=args.market_pre_days,
         market_post_days=args.market_post_days,
         include_raw_trial=args.include_raw_trial,
+        save_to_db=args.save,
     )
-    print(json.dumps(result, indent=2, ensure_ascii=True))
+    payload = result["summary"] if args.summary_only else result
+    print(json.dumps(payload, indent=2, ensure_ascii=True))
 
 
 if __name__ == "__main__":

@@ -101,3 +101,35 @@ CLINICAL_TRIALS_INDEX_SQL = [
     "create index if not exists clinical_trials_event_date_candidate_idx on clinical_trials (event_date_candidate);",
     "create index if not exists clinical_trials_has_results_idx on clinical_trials (has_results);",
 ]
+
+
+TRIAL_ANALYSES_TABLE_SQL = """
+create table if not exists trial_analyses (
+  analysis_id bigserial primary key,
+  nct_id text not null references clinical_trials (nct_id) on delete cascade,
+  requested_nct_id text,
+  mapped_ticker text,
+  mapped_cik text,
+  sponsor_name text,
+  event_date_candidate text,
+  event_date_source text,
+  overall_status text,
+  phase_label text,
+  therapeutic_area text,
+  approval_record_count integer,
+  market_record_count integer,
+  event_day_return double precision,
+  post_window_return double precision,
+  warning_count integer not null default 0,
+  analysis_version text not null default '1.0',
+  analysis_payload jsonb not null,
+  created_at timestamptz default now()
+);
+"""
+
+
+TRIAL_ANALYSES_INDEX_SQL = [
+    "create index if not exists trial_analyses_nct_id_idx on trial_analyses (nct_id);",
+    "create index if not exists trial_analyses_mapped_ticker_idx on trial_analyses (mapped_ticker);",
+    "create index if not exists trial_analyses_created_at_idx on trial_analyses (created_at desc);",
+]

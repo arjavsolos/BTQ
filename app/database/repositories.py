@@ -4,7 +4,12 @@ import json
 from typing import Any
 
 from app.database.connection import get_connection
-from app.database.schemas import CLINICAL_TRIALS_INDEX_SQL, CLINICAL_TRIALS_TABLE_SQL
+from app.database.schemas import (
+    CLINICAL_TRIALS_INDEX_SQL,
+    CLINICAL_TRIALS_TABLE_SQL,
+    TRIAL_ANALYSES_INDEX_SQL,
+    TRIAL_ANALYSES_TABLE_SQL,
+)
 
 
 JSON_FIELDS = {
@@ -181,7 +186,70 @@ class ClinicalTrialsRepository:
         return count
 
 
+class TrialAnalysisRepository:
+    def __init__(self, connection: Any) -> None:
+        self.connection = connection
+
+    def create_tables(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(TRIAL_ANALYSES_TABLE_SQL)
+            for statement in TRIAL_ANALYSES_INDEX_SQL:
+                cursor.execute(statement)
+
+    def insert_analysis(self, analysis_record: dict[str, Any]) -> int:
+        summary = analysis_record.get("summary") or {}
+        payload = json.dumps(analysis_record)
+        sql = """
+        insert into trial_analyses (
+            nct_id,
+            requested_nct_id,
+            mapped_ticker,
+            mapped_cik,
+            sponsor_name,
+            event_date_candidate,
+            event_date_source,
+            overall_status,
+            phase_label,
+            therapeutic_area,
+            approval_record_count,
+            market_record_count,
+            event_day_return,
+            post_window_return,
+            warning_count,
+            analysis_version,
+            analysis_payload
+        )
+        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        returning analysis_id;
+        """
+        values = (
+            summary.get("nct_id"),
+            analysis_record.get("trial", {}).get("requested_nct_id"),
+            summary.get("mapped_ticker"),
+            summary.get("mapped_cik"),
+            summary.get("sponsor_name"),
+            summary.get("event_date_candidate"),
+            summary.get("event_date_source"),
+            summary.get("overall_status"),
+            summary.get("phase_label"),
+            summary.get("therapeutic_area"),
+            summary.get("approval_record_count"),
+            summary.get("market_record_count"),
+            summary.get("event_day_return"),
+            summary.get("post_window_return"),
+            len(analysis_record.get("warnings") or []),
+            analysis_record.get("analysis_version", "1.0"),
+            payload,
+        )
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, values)
+            row = cursor.fetchone()
+        return int(row[0])
+
+
 def initialize_database() -> None:
     with get_connection() as connection:
-        repository = ClinicalTrialsRepository(connection)
-        repository.create_tables()
+        trial_repository = ClinicalTrialsRepository(connection)
+        analysis_repository = TrialAnalysisRepository(connection)
+        trial_repository.create_tables()
+        analysis_repository.create_tables()
