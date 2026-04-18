@@ -8,7 +8,6 @@ from typing import Any
 
 import requests
 
-
 API_BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
 SOURCE_SYSTEM = "clinicaltrials.gov"
 SOURCE_API_VERSION = "v2"

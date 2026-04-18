@@ -10,7 +10,6 @@ from typing import Any
 
 import requests
 
-
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 DEFAULT_CACHE_PATH = Path("data/raw/sec/company_tickers.json")
 CORPORATE_SUFFIXES = {

@@ -9,7 +9,6 @@ from app.database.schemas import (
     TRIAL_ANALYSES_TABLE_SQL,
 )
 
-
 JSON_FIELDS = {
     "nct_aliases",
     "secondary_ids",

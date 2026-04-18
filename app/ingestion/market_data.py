@@ -7,7 +7,6 @@ from typing import Any
 
 import requests
 
-
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
 
 
