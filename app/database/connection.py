@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 from urllib.parse import quote_plus
 
 try:

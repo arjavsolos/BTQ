@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 CLINICAL_TRIALS_TABLE_SQL = """
 create table if not exists clinical_trials (
   nct_id text primary key,

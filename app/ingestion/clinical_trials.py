@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import json
 import re
@@ -107,7 +105,11 @@ class ClinicalTrialsIngestor:
                 response = self.session.get(url, params=params, timeout=self.timeout)
                 if response.status_code in {429, 500, 502, 503, 504} and attempt < self.max_retries:
                     retry_after = response.headers.get("Retry-After")
-                    sleep_seconds = float(retry_after) if retry_after and retry_after.isdigit() else self.retry_backoff_seconds * attempt
+                    sleep_seconds = (
+                        float(retry_after)
+                        if retry_after and retry_after.isdigit()
+                        else self.retry_backoff_seconds * attempt
+                    )
                     time.sleep(sleep_seconds)
                     continue
                 response.raise_for_status()
@@ -125,7 +127,9 @@ class ClinicalTrialsIngestor:
                 if attempt >= self.max_retries:
                     break
                 time.sleep(self.retry_backoff_seconds * attempt)
-        raise RuntimeError(f"ClinicalTrials.gov request failed after {self.max_retries} attempts: {last_error}") from last_error
+        raise RuntimeError(
+            f"ClinicalTrials.gov request failed after {self.max_retries} attempts: {last_error}"
+        ) from last_error
 
     def _coerce_int(self, value: Any) -> int | None:
         try:
@@ -200,7 +204,9 @@ class ClinicalTrialsIngestor:
         return flags
 
     def _post_filter_record(self, record: dict[str, Any], query: TrialQuery) -> bool:
-        if query.sponsor_name and self._normalize_text(query.sponsor_name) not in self._normalize_text(record.get("sponsor_name")):
+        if query.sponsor_name and self._normalize_text(
+            query.sponsor_name
+        ) not in self._normalize_text(record.get("sponsor_name")):
             return False
         if query.condition:
             normalized_condition = self._normalize_text(query.condition)
@@ -219,7 +225,11 @@ class ClinicalTrialsIngestor:
                 return False
         if query.country:
             normalized_country = self._normalize_text(query.country)
-            countries = [self._normalize_text(item.get("country")) for item in (record.get("locations") or []) if item.get("country")]
+            countries = [
+                self._normalize_text(item.get("country"))
+                for item in (record.get("locations") or [])
+                if item.get("country")
+            ]
             if normalized_country not in countries:
                 return False
         if query.has_results is not None and bool(record.get("has_results")) != query.has_results:
@@ -450,7 +460,16 @@ class ClinicalTrialsIngestor:
 
     def build_search_params(self, query: TrialQuery) -> dict[str, Any]:
         params: dict[str, Any] = {"pageSize": max(1, min(query.page_size, 1000))}
-        term_parts = [item for item in [query.query_term, query.sponsor_name, query.condition, query.intervention_name] if item]
+        term_parts = [
+            item
+            for item in [
+                query.query_term,
+                query.sponsor_name,
+                query.condition,
+                query.intervention_name,
+            ]
+            if item
+        ]
         if term_parts:
             params["query.term"] = " ".join(term_parts)
         if query.filter_overall_status:
