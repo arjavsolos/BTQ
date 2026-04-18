@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import json
 import time
@@ -206,7 +204,16 @@ def main() -> None:
     if args.out:
         ingestor.export_records(records, args.out, format=args.out_format)
 
-    print(json.dumps({"count": len(records), "records": records[: min(len(records), args.limit)]}, indent=2, ensure_ascii=True))
+    print(
+        json.dumps(
+            {
+                "count": len(records),
+                "records": records[: min(len(records), args.limit)],
+            },
+            indent=2,
+            ensure_ascii=True,
+        )
+    )
 
 
 if __name__ == "__main__":

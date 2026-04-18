@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +41,7 @@ class MarketDataIngestor:
         return datetime.strptime(value, "%Y-%m-%d")
 
     def _to_unix(self, value: datetime) -> int:
-        return int(value.replace(tzinfo=timezone.utc).timestamp())
+        return int(value.replace(tzinfo=UTC).timestamp())
 
     def _extract_chart_rows(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
         result = ((payload.get("chart") or {}).get("result") or [None])[0]
@@ -62,7 +60,7 @@ class MarketDataIngestor:
 
         rows: list[dict[str, Any]] = []
         for index, ts in enumerate(timestamps):
-            trade_date = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+            trade_date = datetime.fromtimestamp(ts, tz=UTC).strftime("%Y-%m-%d")
             rows.append(
                 {
                     "trade_date": trade_date,
@@ -108,7 +106,13 @@ class MarketDataIngestor:
             include_prepost=window.include_prepost,
         )
 
-    def summarize_event_reaction(self, ticker: str, event_date: str, pre_days: int = 5, post_days: int = 5) -> dict[str, Any]:
+    def summarize_event_reaction(
+        self,
+        ticker: str,
+        event_date: str,
+        pre_days: int = 5,
+        post_days: int = 5,
+    ) -> dict[str, Any]:
         records = self.fetch_event_window(
             EventWindow(
                 ticker=ticker,
