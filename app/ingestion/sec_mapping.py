@@ -127,7 +127,8 @@ class SecCompanyMapper:
                 self._registry = json.loads(self.cache_path.read_text(encoding="utf-8"))
                 return self._registry
             raise RuntimeError(
-                "SEC registry download failed. Set SEC_CONTACT_EMAIL/SEC_CONTACT_NAME for a compliant User-Agent or provide a cached registry file."
+                "SEC registry download failed. Set SEC_CONTACT_EMAIL/SEC_CONTACT_NAME "
+                "for a compliant User-Agent or provide a cached registry file."
             ) from exc
 
     def load_registry(self) -> list[dict[str, Any]]:

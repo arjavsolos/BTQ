@@ -4,8 +4,8 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime, timezone
 from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -197,7 +197,7 @@ class TrialAnalysisService:
             "status": "success",
             "analysis_type": "single_trial",
             "analysis_version": ANALYSIS_VERSION,
-            "analyzed_at": datetime.now(timezone.utc).isoformat(),
+            "analyzed_at": datetime.now(UTC).isoformat(),
             "input": {
                 "nct_id": nct_id,
                 "approval_limit": approval_limit,
@@ -228,7 +228,11 @@ class TrialAnalysisService:
             else:
                 analysis["persistence"] = {"saved": False, "analysis_id": None}
                 analysis["warnings"] = self._normalize_warnings(
-                    analysis["warnings"] + ["Analysis could not be persisted because the database was unavailable or not configured."]
+                    analysis["warnings"]
+                    + [
+                        "Analysis could not be persisted because the database was unavailable "
+                        "or not configured."
+                    ]
                 )
         return analysis
 
