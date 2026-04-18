@@ -1,0 +1,23 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+respect-gitignore = true
+force-exclude = true
+extend-exclude = [
+  "venv",
+  "data",
+]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "UP",
+  "B",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"run.py" = ["E402"]
+"scripts/*.py" = ["E402"]
+"app/services/trial_analysis_service.py" = ["E402"]

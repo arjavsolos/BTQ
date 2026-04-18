@@ -13,14 +13,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.database.connection import DatabaseConfigError, get_connection
+from app.database.repositories import ClinicalTrialsRepository, TrialAnalysisRepository
 from app.ingestion import (
     ClinicalTrialsIngestor,
     MarketDataIngestor,
     OpenFDAIngestor,
     SecCompanyMapper,
 )
-from app.database.connection import DatabaseConfigError, get_connection
-from app.database.repositories import ClinicalTrialsRepository, TrialAnalysisRepository
 
 
 DAY_PRECISION_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")

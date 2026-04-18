@@ -17,8 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="BTQ project runner")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_db = subparsers.add_parser("init-db", help="Initialize database tables")
-    init_db.set_defaults(command="init-db")
+    subparsers.add_parser("init-db", help="Initialize database tables")
 
     analyze = subparsers.add_parser("analyze-trial", help="Run end-to-end analysis for one NCT ID")
     analyze.add_argument("nct_id")
