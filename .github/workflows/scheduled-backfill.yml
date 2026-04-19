@@ -283,23 +283,24 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -f logs/backfill_output.json ]; then
-            python -c "
+            cat > /tmp/backfill_summary.py <<'PY'
 import json
 import os
 from pathlib import Path
 
-payload = json.loads(Path('logs/backfill_output.json').read_text(encoding='utf-8'))
+payload = json.loads(Path("logs/backfill_output.json").read_text(encoding="utf-8"))
 summary_lines = [
-    '',
-    '### Backfill Result',
-    '',
-    f\"- Status: `{payload.get('status', 'unknown')}`\",
-    f\"- Fetched records: `{payload.get('fetched_records', 'unknown')}`\",
-    f\"- Upserted records: `{payload.get('upserted_records', 'unknown')}`\",
+    "",
+    "### Backfill Result",
+    "",
+    f"- Status: `{payload.get('status', 'unknown')}`",
+    f"- Fetched records: `{payload.get('fetched_records', 'unknown')}`",
+    f"- Upserted records: `{payload.get('upserted_records', 'unknown')}`",
 ]
-with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as handle:
-    handle.write('\\n'.join(summary_lines) + '\\n')
-"
+with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+    handle.write("\n".join(summary_lines) + "\n")
+PY
+            python /tmp/backfill_summary.py
           fi
 
       - name: Upload backfill logs
