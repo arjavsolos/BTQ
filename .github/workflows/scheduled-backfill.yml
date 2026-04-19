@@ -82,6 +82,7 @@ env:
   PYTHONUNBUFFERED: "1"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   PIP_NO_PYTHON_VERSION_WARNING: "1"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   backfill-clinical-trials:
@@ -173,19 +174,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          query="${INPUT_QUERY:-${DEFAULT_QUERY:-}}"
-          status="${INPUT_STATUS:-${DEFAULT_STATUS:-COMPLETED}}"
-          phase="${INPUT_PHASE:-${DEFAULT_PHASE:-}}"
-          study_type="${INPUT_STUDY_TYPE:-${DEFAULT_STUDY_TYPE:-}}"
-          sponsor="${INPUT_SPONSOR:-${DEFAULT_SPONSOR:-}}"
-          condition="${INPUT_CONDITION:-${DEFAULT_CONDITION:-Neoplasms}}"
-          intervention="${INPUT_INTERVENTION:-${DEFAULT_INTERVENTION:-}}"
-          intervention_type="${INPUT_INTERVENTION_TYPE:-${DEFAULT_INTERVENTION_TYPE:-}}"
-          country="${INPUT_COUNTRY:-${DEFAULT_COUNTRY:-}}"
-          has_results="${INPUT_HAS_RESULTS:-${DEFAULT_HAS_RESULTS:-true}}"
-          without_results="${INPUT_WITHOUT_RESULTS:-${DEFAULT_WITHOUT_RESULTS:-false}}"
-          page_size="${INPUT_PAGE_SIZE:-${DEFAULT_PAGE_SIZE:-50}}"
-          pages="${INPUT_PAGES:-${DEFAULT_PAGES:-2}}"
+          resolve_value() {
+            local input_value="${1:-}"
+            local default_value="${2:-}"
+            local fallback_value="${3:-}"
+
+            if [ -n "${input_value}" ]; then
+              printf '%s' "${input_value}"
+            elif [ -n "${default_value}" ]; then
+              printf '%s' "${default_value}"
+            else
+              printf '%s' "${fallback_value}"
+            fi
+          }
+
+          query="$(resolve_value "${INPUT_QUERY:-}" "${DEFAULT_QUERY:-}" "")"
+          status="$(resolve_value "${INPUT_STATUS:-}" "${DEFAULT_STATUS:-}" "COMPLETED")"
+          phase="$(resolve_value "${INPUT_PHASE:-}" "${DEFAULT_PHASE:-}" "")"
+          study_type="$(resolve_value "${INPUT_STUDY_TYPE:-}" "${DEFAULT_STUDY_TYPE:-}" "")"
+          sponsor="$(resolve_value "${INPUT_SPONSOR:-}" "${DEFAULT_SPONSOR:-}" "")"
+          condition="$(resolve_value "${INPUT_CONDITION:-}" "${DEFAULT_CONDITION:-}" "Neoplasms")"
+          intervention="$(resolve_value "${INPUT_INTERVENTION:-}" "${DEFAULT_INTERVENTION:-}" "")"
+          intervention_type="$(resolve_value "${INPUT_INTERVENTION_TYPE:-}" "${DEFAULT_INTERVENTION_TYPE:-}" "")"
+          country="$(resolve_value "${INPUT_COUNTRY:-}" "${DEFAULT_COUNTRY:-}" "")"
+          has_results="$(resolve_value "${INPUT_HAS_RESULTS:-}" "${DEFAULT_HAS_RESULTS:-}" "true")"
+          without_results="$(resolve_value "${INPUT_WITHOUT_RESULTS:-}" "${DEFAULT_WITHOUT_RESULTS:-}" "false")"
+          page_size="$(resolve_value "${INPUT_PAGE_SIZE:-}" "${DEFAULT_PAGE_SIZE:-}" "50")"
+          pages="$(resolve_value "${INPUT_PAGES:-}" "${DEFAULT_PAGES:-}" "2")"
 
           echo "query=${query}" >> "$GITHUB_OUTPUT"
           echo "status=${status}" >> "$GITHUB_OUTPUT"
@@ -255,7 +270,7 @@ jobs:
           printf 'Running command: %q ' "${cmd[@]}" | tee logs/backfill.log
           printf '\n' | tee -a logs/backfill.log
 
-          output="$("${cmd[@]}")"
+          output="$("${cmd[@]}" 2>&1)"
           printf '%s\n' "$output" | tee -a logs/backfill.log
           printf '%s\n' "$output" > logs/backfill_output.json
 
