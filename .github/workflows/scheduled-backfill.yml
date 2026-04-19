@@ -225,58 +225,38 @@ jobs:
       - name: Run clinical trials backfill
         id: backfill
         shell: bash
+        env:
+          BACKFILL_QUERY: ${{ steps.config.outputs.query }}
+          BACKFILL_STATUS: ${{ steps.config.outputs.status }}
+          BACKFILL_PHASE: ${{ steps.config.outputs.phase }}
+          BACKFILL_STUDY_TYPE: ${{ steps.config.outputs.study_type }}
+          BACKFILL_SPONSOR: ${{ steps.config.outputs.sponsor }}
+          BACKFILL_CONDITION: ${{ steps.config.outputs.condition }}
+          BACKFILL_INTERVENTION: ${{ steps.config.outputs.intervention }}
+          BACKFILL_INTERVENTION_TYPE: ${{ steps.config.outputs.intervention_type }}
+          BACKFILL_COUNTRY: ${{ steps.config.outputs.country }}
+          BACKFILL_HAS_RESULTS: ${{ steps.config.outputs.has_results }}
+          BACKFILL_WITHOUT_RESULTS: ${{ steps.config.outputs.without_results }}
+          BACKFILL_PAGE_SIZE: ${{ steps.config.outputs.page_size }}
+          BACKFILL_PAGES: ${{ steps.config.outputs.pages }}
         run: |
           set -euo pipefail
           mkdir -p logs
 
-          cmd=(python scripts/backfill_clinical_trials.py)
-          cmd+=(--page-size "${{ steps.config.outputs.page_size }}")
-          cmd+=(--pages "${{ steps.config.outputs.pages }}")
-
-          if [ -n "${{ steps.config.outputs.query }}" ]; then
-            cmd+=(--query "${{ steps.config.outputs.query }}")
-          fi
-          if [ -n "${{ steps.config.outputs.status }}" ]; then
-            cmd+=(--status "${{ steps.config.outputs.status }}")
-          fi
-          if [ -n "${{ steps.config.outputs.phase }}" ]; then
-            cmd+=(--phase "${{ steps.config.outputs.phase }}")
-          fi
-          if [ -n "${{ steps.config.outputs.study_type }}" ]; then
-            cmd+=(--study-type "${{ steps.config.outputs.study_type }}")
-          fi
-          if [ -n "${{ steps.config.outputs.sponsor }}" ]; then
-            cmd+=(--sponsor "${{ steps.config.outputs.sponsor }}")
-          fi
-          if [ -n "${{ steps.config.outputs.condition }}" ]; then
-            cmd+=(--condition "${{ steps.config.outputs.condition }}")
-          fi
-          if [ -n "${{ steps.config.outputs.intervention }}" ]; then
-            cmd+=(--intervention "${{ steps.config.outputs.intervention }}")
-          fi
-          if [ -n "${{ steps.config.outputs.intervention_type }}" ]; then
-            cmd+=(--intervention-type "${{ steps.config.outputs.intervention_type }}")
-          fi
-          if [ -n "${{ steps.config.outputs.country }}" ]; then
-            cmd+=(--country "${{ steps.config.outputs.country }}")
-          fi
-          if [ "${{ steps.config.outputs.has_results }}" = "true" ]; then
-            cmd+=(--has-results)
-          fi
-          if [ "${{ steps.config.outputs.without_results }}" = "true" ]; then
-            cmd+=(--without-results)
-          fi
-
-          printf 'Running command: %q ' "${cmd[@]}" | tee logs/backfill.log
-          printf '\n' | tee -a logs/backfill.log
-
-          output="$("${cmd[@]}" 2>&1)"
+          printf '%s\n' "Running command: python scripts/run_scheduled_backfill.py" | tee logs/backfill.log
+          set +e
+          output="$(python scripts/run_scheduled_backfill.py 2>&1)"
+          status=$?
+          set -e
           printf '%s\n' "$output" | tee -a logs/backfill.log
           printf '%s\n' "$output" > logs/backfill_output.json
+          exit "$status"
 
       - name: Publish workflow summary
         if: always()
         shell: bash
+        env:
+          BACKFILL_OUTPUT_PATH: logs/backfill_output.json
         run: |
           set -euo pipefail
 
@@ -298,31 +278,5 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -f logs/backfill_output.json ]; then
-            cat > /tmp/backfill_summary.py <<'PY'
-            import json
-            import os
-            from pathlib import Path
-
-            payload = json.loads(Path("logs/backfill_output.json").read_text(encoding="utf-8"))
-            summary_lines = [
-                "",
-                "### Backfill Result",
-                "",
-                f"- Status: `{payload.get('status', 'unknown')}`",
-                f"- Fetched records: `{payload.get('fetched_records', 'unknown')}`",
-                f"- Upserted records: `{payload.get('upserted_records', 'unknown')}`",
-            ]
-            with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
-                handle.write("\n".join(summary_lines) + "\n")
-            PY
-            python /tmp/backfill_summary.py
+            python scripts/publish_backfill_summary.py
           fi
-
-      - name: Upload backfill logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: scheduled-backfill-logs
-          path: logs/
-          if-no-files-found: ignore
-          retention-days: 14
