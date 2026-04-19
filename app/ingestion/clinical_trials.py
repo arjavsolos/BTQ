@@ -459,24 +459,27 @@ class ClinicalTrialsIngestor:
 
     def build_search_params(self, query: TrialQuery) -> dict[str, Any]:
         params: dict[str, Any] = {"pageSize": max(1, min(query.page_size, 1000))}
-        term_parts = [
-            item
-            for item in [
-                query.query_term,
-                query.sponsor_name,
-                query.condition,
-                query.intervention_name,
-            ]
-            if item
-        ]
-        if term_parts:
-            params["query.term"] = " ".join(term_parts)
+        if query.query_term:
+            params["query.term"] = query.query_term
+        if query.condition:
+            params["query.cond"] = query.condition
+        if query.intervention_name:
+            params["query.intr"] = query.intervention_name
+        if query.country:
+            params["query.locn"] = query.country
+        if query.sponsor_name:
+            params["query.term"] = " ".join(
+                item for item in [params.get("query.term"), query.sponsor_name] if item
+            )
         if query.filter_overall_status:
             params["filter.overallStatus"] = query.filter_overall_status
+        advanced_filters: list[str] = []
         if query.filter_phase:
-            params["filter.advanced"] = f"AREA[Phase]{query.filter_phase}"
+            advanced_filters.append(f"AREA[Phase]{query.filter_phase}")
         if query.filter_study_type:
-            params["filter.studyType"] = query.filter_study_type
+            advanced_filters.append(f"AREA[StudyType]{query.filter_study_type}")
+        if advanced_filters:
+            params["filter.advanced"] = " AND ".join(advanced_filters)
         return params
 
     def search_trials(

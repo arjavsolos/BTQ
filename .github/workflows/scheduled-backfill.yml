@@ -23,7 +23,7 @@ on:
       study_type:
         description: "Study type filter"
         required: false
-        default: "INTERVENTIONAL"
+        default: ""
         type: string
       sponsor:
         description: "Optional sponsor filter"
@@ -176,7 +176,7 @@ jobs:
           query="${INPUT_QUERY:-${DEFAULT_QUERY:-}}"
           status="${INPUT_STATUS:-${DEFAULT_STATUS:-COMPLETED}}"
           phase="${INPUT_PHASE:-${DEFAULT_PHASE:-}}"
-          study_type="${INPUT_STUDY_TYPE:-${DEFAULT_STUDY_TYPE:-INTERVENTIONAL}}"
+          study_type="${INPUT_STUDY_TYPE:-${DEFAULT_STUDY_TYPE:-}}"
           sponsor="${INPUT_SPONSOR:-${DEFAULT_SPONSOR:-}}"
           condition="${INPUT_CONDITION:-${DEFAULT_CONDITION:-Neoplasms}}"
           intervention="${INPUT_INTERVENTION:-${DEFAULT_INTERVENTION:-}}"
@@ -283,23 +283,23 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -f logs/backfill_output.json ]; then
-            python - <<'PY'
-            import json
-            import os
-            from pathlib import Path
+            python -c "
+import json
+import os
+from pathlib import Path
 
-            payload = json.loads(Path("logs/backfill_output.json").read_text(encoding="utf-8"))
-            summary_lines = [
-                "",
-                "### Backfill Result",
-                "",
-                f"- Status: `{payload.get('status', 'unknown')}`",
-                f"- Fetched records: `{payload.get('fetched_records', 'unknown')}`",
-                f"- Upserted records: `{payload.get('upserted_records', 'unknown')}`",
-            ]
-            with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
-                handle.write("\n".join(summary_lines) + "\n")
-            PY
+payload = json.loads(Path('logs/backfill_output.json').read_text(encoding='utf-8'))
+summary_lines = [
+    '',
+    '### Backfill Result',
+    '',
+    f\"- Status: `{payload.get('status', 'unknown')}`\",
+    f\"- Fetched records: `{payload.get('fetched_records', 'unknown')}`\",
+    f\"- Upserted records: `{payload.get('upserted_records', 'unknown')}`\",
+]
+with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as handle:
+    handle.write('\\n'.join(summary_lines) + '\\n')
+"
           fi
 
       - name: Upload backfill logs
