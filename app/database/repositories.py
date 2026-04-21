@@ -441,15 +441,25 @@ class HistoricalTrialEventRepository:
         select
             count(*) as total_events,
             count(*) filter (where is_model_ready) as model_ready_events,
-            count(*) filter (where mapped_ticker is null or btrim(mapped_ticker) = '') as missing_ticker_events,
-            count(*) filter (where event_date_candidate is null or btrim(event_date_candidate) = '') as missing_event_date_events,
-            count(*) filter (where market_record_count is null or market_record_count = 0) as missing_market_data_events,
+            count(*) filter (
+                where mapped_ticker is null or btrim(mapped_ticker) = ''
+            ) as missing_ticker_events,
+            count(*) filter (
+                where event_date_candidate is null or btrim(event_date_candidate) = ''
+            ) as missing_event_date_events,
+            count(*) filter (
+                where market_record_count is null or market_record_count = 0
+            ) as missing_market_data_events,
             count(*) filter (where event_day_return is null) as missing_event_return_events,
             count(*) filter (where approval_record_count = 0) as missing_fda_context_events,
             count(*) filter (where warning_count > 0) as warning_events,
             count(*) filter (where mapping_confidence is null) as missing_mapping_confidence_events,
-            count(*) filter (where mapping_confidence is not null and mapping_confidence < 0.8) as low_confidence_mapping_events,
-            count(*) filter (where data_completeness_ratio is null or data_completeness_ratio < 0.7) as low_completeness_events,
+            count(*) filter (
+                where mapping_confidence is not null and mapping_confidence < 0.8
+            ) as low_confidence_mapping_events,
+            count(*) filter (
+                where data_completeness_ratio is null or data_completeness_ratio < 0.7
+            ) as low_completeness_events,
             avg(data_completeness_ratio) as average_data_completeness_ratio,
             avg(mapping_confidence) as average_mapping_confidence,
             avg(event_day_return) as average_event_day_return,

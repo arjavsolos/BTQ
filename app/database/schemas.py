@@ -186,7 +186,13 @@ create table if not exists historical_trial_events (
 HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
     "create index if not exists historical_trial_events_nct_id_idx on historical_trial_events (nct_id);",
     "create index if not exists historical_trial_events_ticker_idx on historical_trial_events (mapped_ticker);",
-    "create index if not exists historical_trial_events_event_date_idx on historical_trial_events (event_date_candidate);",
-    "create index if not exists historical_trial_events_model_ready_idx on historical_trial_events (is_model_ready);",
+    (
+        "create index if not exists historical_trial_events_event_date_idx "
+        "on historical_trial_events (event_date_candidate);"
+    ),
+    (
+        "create index if not exists historical_trial_events_model_ready_idx "
+        "on historical_trial_events (is_model_ready);"
+    ),
     "create index if not exists historical_trial_events_created_at_idx on historical_trial_events (created_at desc);",
 ]
