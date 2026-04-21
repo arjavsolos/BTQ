@@ -130,3 +130,63 @@ TRIAL_ANALYSES_INDEX_SQL = [
     "create index if not exists trial_analyses_mapped_ticker_idx on trial_analyses (mapped_ticker);",
     "create index if not exists trial_analyses_created_at_idx on trial_analyses (created_at desc);",
 ]
+
+
+HISTORICAL_TRIAL_EVENTS_TABLE_SQL = """
+create table if not exists historical_trial_events (
+  event_id bigserial primary key,
+  analysis_id bigint references trial_analyses (analysis_id) on delete set null,
+  nct_id text not null references clinical_trials (nct_id) on delete cascade,
+  requested_nct_id text,
+  brief_title text,
+  sponsor_name text,
+  sponsor_class text,
+  overall_status text,
+  phase_label text,
+  phase_score integer,
+  study_type text,
+  therapeutic_area text,
+  enrollment_count integer,
+  has_results boolean,
+  data_completeness_score integer,
+  data_completeness_ratio double precision,
+  event_date_candidate text,
+  event_date_source text,
+  event_date_precision text,
+  mapped_ticker text,
+  mapped_cik text,
+  matched_company_name text,
+  mapping_confidence double precision,
+  mapping_match_type text,
+  approval_record_count integer not null default 0,
+  approval_application_numbers jsonb,
+  approval_brand_names jsonb,
+  approval_sponsor_names jsonb,
+  market_record_count integer,
+  trade_start text,
+  trade_end text,
+  prior_close double precision,
+  event_close double precision,
+  latest_close double precision,
+  event_day_return double precision,
+  post_window_return double precision,
+  warning_count integer not null default 0,
+  warnings jsonb not null default '[]'::jsonb,
+  is_model_ready boolean not null default false,
+  dataset_version text not null default '1.0',
+  source_analysis_version text,
+  feature_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (nct_id, event_date_candidate, mapped_ticker)
+);
+"""
+
+
+HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
+    "create index if not exists historical_trial_events_nct_id_idx on historical_trial_events (nct_id);",
+    "create index if not exists historical_trial_events_ticker_idx on historical_trial_events (mapped_ticker);",
+    "create index if not exists historical_trial_events_event_date_idx on historical_trial_events (event_date_candidate);",
+    "create index if not exists historical_trial_events_model_ready_idx on historical_trial_events (is_model_ready);",
+    "create index if not exists historical_trial_events_created_at_idx on historical_trial_events (created_at desc);",
+]

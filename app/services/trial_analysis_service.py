@@ -14,13 +14,18 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.database.connection import DatabaseConfigError, get_connection
-from app.database.repositories import ClinicalTrialsRepository, TrialAnalysisRepository
+from app.database.repositories import (
+    ClinicalTrialsRepository,
+    HistoricalTrialEventRepository,
+    TrialAnalysisRepository,
+)
 from app.ingestion import (
     ClinicalTrialsIngestor,
     MarketDataIngestor,
     OpenFDAIngestor,
     SecCompanyMapper,
 )
+from app.services.historical_trial_event_service import HistoricalTrialEventService
 
 
 DAY_PRECISION_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -45,6 +50,7 @@ class TrialAnalysisService:
         self.openfda_ingestor = openfda_ingestor or OpenFDAIngestor()
         self.market_data_ingestor = market_data_ingestor or MarketDataIngestor()
         self.persist_trial_records = persist_trial_records
+        self.historical_event_service = HistoricalTrialEventService()
 
     def _normalize_warnings(self, warnings: list[str]) -> list[str]:
         deduped: list[str] = []
@@ -150,16 +156,24 @@ class TrialAnalysisService:
             warnings.append(f"OpenFDA fetch failed: {exc}")
             return [], warnings
 
-    def _persist_analysis(self, trial: dict[str, Any], analysis: dict[str, Any]) -> int | None:
+    def _persist_analysis(self, trial: dict[str, Any], analysis: dict[str, Any]) -> dict[str, int] | None:
         try:
             with get_connection() as connection:
                 trial_repository = ClinicalTrialsRepository(connection)
                 analysis_repository = TrialAnalysisRepository(connection)
+                historical_event_repository = HistoricalTrialEventRepository(connection)
                 trial_repository.create_tables()
                 analysis_repository.create_tables()
+                historical_event_repository.create_tables()
                 if self.persist_trial_records and trial.get("nct_id"):
                     trial_repository.upsert_trial(trial)
-                return analysis_repository.insert_analysis(analysis)
+                analysis_id = analysis_repository.insert_analysis(analysis)
+                event_record = self.historical_event_service.build_event_record(
+                    analysis=analysis,
+                    analysis_id=analysis_id,
+                )
+                event_id = historical_event_repository.upsert_event(event_record)
+                return {"analysis_id": analysis_id, "historical_event_id": event_id}
         except DatabaseConfigError:
             return None
 
@@ -222,11 +236,19 @@ class TrialAnalysisService:
             "warnings": warnings,
         }
         if save_to_db:
-            analysis_id = self._persist_analysis(trial, analysis)
-            if analysis_id is not None:
-                analysis["persistence"] = {"saved": True, "analysis_id": analysis_id}
+            persistence_ids = self._persist_analysis(trial, analysis)
+            if persistence_ids is not None:
+                analysis["persistence"] = {
+                    "saved": True,
+                    "analysis_id": persistence_ids["analysis_id"],
+                    "historical_event_id": persistence_ids["historical_event_id"],
+                }
             else:
-                analysis["persistence"] = {"saved": False, "analysis_id": None}
+                analysis["persistence"] = {
+                    "saved": False,
+                    "analysis_id": None,
+                    "historical_event_id": None,
+                }
                 analysis["warnings"] = self._normalize_warnings(
                     analysis["warnings"]
                     + [

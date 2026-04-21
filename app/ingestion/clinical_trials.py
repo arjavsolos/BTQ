@@ -510,8 +510,7 @@ class ClinicalTrialsIngestor:
                 page_token = payload.get("nextPageToken")
                 if not page_token:
                     break
-                if query.max_pages is not None and page_count >= query.max_pages:
-                    break
+                if query.max_pages is not None and page_count >= query.max_pages:                    break
         except requests.RequestException as exc:
             raise RuntimeError(f"ClinicalTrials.gov pagination failed: {exc}") from exc
         deduped_records = self._dedupe_records(records)

@@ -5,6 +5,8 @@ from app.database.connection import get_connection
 from app.database.schemas import (
     CLINICAL_TRIALS_INDEX_SQL,
     CLINICAL_TRIALS_TABLE_SQL,
+    HISTORICAL_TRIAL_EVENTS_INDEX_SQL,
+    HISTORICAL_TRIAL_EVENTS_TABLE_SQL,
     TRIAL_ANALYSES_INDEX_SQL,
     TRIAL_ANALYSES_TABLE_SQL,
 )
@@ -35,6 +37,14 @@ JSON_FIELDS = {
     "derived_misc_info",
     "central_contacts",
     "overall_officials",
+}
+
+HISTORICAL_EVENT_JSON_FIELDS = {
+    "approval_application_numbers",
+    "approval_brand_names",
+    "approval_sponsor_names",
+    "warnings",
+    "feature_payload",
 }
 
 COLUMN_SOURCE_MAP = {
@@ -186,6 +196,64 @@ class ClinicalTrialsRepository:
             count += 1
         return count
 
+    def list_trial_identifiers(
+        self,
+        limit: int = 100,
+        overall_status: str | None = None,
+        sponsor_name: str | None = None,
+        has_results: bool | None = None,
+        require_event_date: bool = True,
+    ) -> list[dict[str, Any]]:
+        clauses = []
+        params: list[Any] = []
+
+        if overall_status:
+            clauses.append("overall_status = %s")
+            params.append(overall_status)
+        if sponsor_name:
+            clauses.append("sponsor_name ilike %s")
+            params.append(f"%{sponsor_name}%")
+        if has_results is not None:
+            clauses.append("has_results = %s")
+            params.append(has_results)
+        if require_event_date:
+            clauses.append("event_date_candidate is not null")
+
+        where_clause = ""
+        if clauses:
+            where_clause = "where " + " and ".join(clauses)
+
+        sql = f"""
+        select
+            nct_id,
+            sponsor_name,
+            overall_status,
+            phase_label,
+            event_date_candidate
+        from clinical_trials
+        {where_clause}
+        order by
+            event_date_candidate desc nulls last,
+            updated_at desc
+        limit %s;
+        """
+        params.append(max(1, limit))
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "nct_id": row[0],
+                "sponsor_name": row[1],
+                "overall_status": row[2],
+                "phase_label": row[3],
+                "event_date_candidate": row[4],
+            }
+            for row in rows
+        ]
+
 
 class TrialAnalysisRepository:
     def __init__(self, connection: Any) -> None:
@@ -248,9 +316,132 @@ class TrialAnalysisRepository:
         return int(row[0])
 
 
+HISTORICAL_EVENT_COLUMNS = [
+    "analysis_id",
+    "nct_id",
+    "requested_nct_id",
+    "brief_title",
+    "sponsor_name",
+    "sponsor_class",
+    "overall_status",
+    "phase_label",
+    "phase_score",
+    "study_type",
+    "therapeutic_area",
+    "enrollment_count",
+    "has_results",
+    "data_completeness_score",
+    "data_completeness_ratio",
+    "event_date_candidate",
+    "event_date_source",
+    "event_date_precision",
+    "mapped_ticker",
+    "mapped_cik",
+    "matched_company_name",
+    "mapping_confidence",
+    "mapping_match_type",
+    "approval_record_count",
+    "approval_application_numbers",
+    "approval_brand_names",
+    "approval_sponsor_names",
+    "market_record_count",
+    "trade_start",
+    "trade_end",
+    "prior_close",
+    "event_close",
+    "latest_close",
+    "event_day_return",
+    "post_window_return",
+    "warning_count",
+    "warnings",
+    "is_model_ready",
+    "dataset_version",
+    "source_analysis_version",
+    "feature_payload",
+]
+
+
+class HistoricalTrialEventRepository:
+    def __init__(self, connection: Any) -> None:
+        self.connection = connection
+
+    def create_tables(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(HISTORICAL_TRIAL_EVENTS_TABLE_SQL)
+            for statement in HISTORICAL_TRIAL_EVENTS_INDEX_SQL:
+                cursor.execute(statement)
+
+    def upsert_event(self, event_record: dict[str, Any]) -> int:
+        placeholders = ", ".join(["%s"] * len(HISTORICAL_EVENT_COLUMNS))
+        insert_columns = ", ".join(HISTORICAL_EVENT_COLUMNS)
+        update_assignments = ", ".join(
+            f"{column} = excluded.{column}" for column in HISTORICAL_EVENT_COLUMNS if column != "nct_id"
+        )
+        values = []
+        for column in HISTORICAL_EVENT_COLUMNS:
+            value = event_record.get(column)
+            if column in HISTORICAL_EVENT_JSON_FIELDS:
+                value = json.dumps(value if value is not None else ([] if column != "feature_payload" else {}))
+            values.append(value)
+
+        sql = f"""
+        insert into historical_trial_events ({insert_columns})
+        values ({placeholders})
+        on conflict (nct_id, event_date_candidate, mapped_ticker) do update
+        set {update_assignments},
+            updated_at = now()
+        returning event_id;
+        """
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, values)
+            row = cursor.fetchone()
+        return int(row[0])
+
+    def list_recent_events(self, limit: int = 100) -> list[dict[str, Any]]:
+        sql = """
+        select
+            event_id,
+            analysis_id,
+            nct_id,
+            requested_nct_id,
+            sponsor_name,
+            mapped_ticker,
+            event_date_candidate,
+            event_day_return,
+            post_window_return,
+            is_model_ready,
+            created_at
+        from historical_trial_events
+        order by created_at desc
+        limit %s;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (max(1, limit),))
+            rows = cursor.fetchall()
+        return [
+            {
+                "event_id": row[0],
+                "analysis_id": row[1],
+                "nct_id": row[2],
+                "requested_nct_id": row[3],
+                "sponsor_name": row[4],
+                "mapped_ticker": row[5],
+                "event_date_candidate": row[6],
+                "event_day_return": row[7],
+                "post_window_return": row[8],
+                "is_model_ready": row[9],
+                "created_at": str(row[10]),
+            }
+            for row in rows
+        ]
+
+
 def initialize_database() -> None:
     with get_connection() as connection:
         trial_repository = ClinicalTrialsRepository(connection)
         analysis_repository = TrialAnalysisRepository(connection)
+        historical_repository = HistoricalTrialEventRepository(connection)
         trial_repository.create_tables()
         analysis_repository.create_tables()
+        historical_repository.create_tables()

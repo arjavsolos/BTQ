@@ -53,6 +53,7 @@ def main() -> None:
                     "",
                     f"- Saved: `{persistence.get('saved')}`",
                     f"- Analysis ID: `{persistence.get('analysis_id')}`",
+                    f"- Historical event ID: `{persistence.get('historical_event_id')}`",
                 ]
             )
 
