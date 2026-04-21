@@ -29,9 +29,6 @@ CORPORATE_SUFFIXES = {
     "holdings",
     "holding",
     "group",
-    "therapeutics",
-    "biopharma",
-    "biosciences",
 }
 
 
@@ -77,10 +74,32 @@ class SecCompanyMapper:
     def _normalize_company_name(self, value: str | None) -> str:
         if not value:
             return ""
-        normalized = re.sub(r"[^a-zA-Z0-9\s]", " ", value).lower()
+        normalized = re.sub(r"\([^)]*\)", " ", value)
+        normalized = normalized.replace("&", " and ")
+        normalized = re.sub(r"[^a-zA-Z0-9\s]", " ", normalized).lower()
         parts = [part for part in normalized.split() if part]
         filtered = [part for part in parts if part not in CORPORATE_SUFFIXES]
         return " ".join(filtered)
+
+    def _candidate_normalized_names(self, value: str | None) -> list[str]:
+        if not value:
+            return []
+
+        candidates = {
+            self._normalize_company_name(value),
+            self._normalize_company_name(re.split(r",|/| dba | c/o ", value, maxsplit=1, flags=re.IGNORECASE)[0]),
+        }
+        return [candidate for candidate in candidates if candidate]
+
+    def _token_overlap_score(self, left: str, right: str) -> float:
+        left_tokens = set(left.split())
+        right_tokens = set(right.split())
+        if not left_tokens or not right_tokens:
+            return 0.0
+        overlap = left_tokens & right_tokens
+        if not overlap:
+            return 0.0
+        return len(overlap) / max(1, min(len(left_tokens), len(right_tokens)))
 
     def _cache_is_fresh(self) -> bool:
         if not self.cache_path.exists():
@@ -154,25 +173,52 @@ class SecCompanyMapper:
 
     def match_sponsor_to_ticker(self, sponsor_name: str, minimum_confidence: float = 0.72) -> SponsorMatchResult:
         registry = self.load_registry()
-        normalized_target = self._normalize_company_name(sponsor_name)
-        exact_match = next((item for item in registry if item["normalized_company_name"] == normalized_target), None)
-        if exact_match is not None:
-            return SponsorMatchResult(
-                sponsor_name=sponsor_name,
-                matched_company_name=exact_match["company_name"],
-                ticker=exact_match["ticker"],
-                cik=exact_match["cik"],
-                confidence=1.0,
-                match_type="exact_normalized",
-                alternatives=[],
+        normalized_targets = self._candidate_normalized_names(sponsor_name)
+        for normalized_target in normalized_targets:
+            exact_match = next(
+                (item for item in registry if item["normalized_company_name"] == normalized_target),
+                None,
             )
+            if exact_match is not None:
+                return SponsorMatchResult(
+                    sponsor_name=sponsor_name,
+                    matched_company_name=exact_match["company_name"],
+                    ticker=exact_match["ticker"],
+                    cik=exact_match["cik"],
+                    confidence=1.0,
+                    match_type="exact_normalized",
+                    alternatives=[],
+                )
+
+        for normalized_target in normalized_targets:
+            token_matches: list[tuple[float, dict[str, Any]]] = []
+            for item in registry:
+                overlap_score = self._token_overlap_score(normalized_target, item["normalized_company_name"])
+                if overlap_score < 1.0:
+                    continue
+                token_matches.append((overlap_score, item))
+            if token_matches:
+                best_score, best_item = token_matches[0]
+                return SponsorMatchResult(
+                    sponsor_name=sponsor_name,
+                    matched_company_name=best_item["company_name"],
+                    ticker=best_item["ticker"],
+                    cik=best_item["cik"],
+                    confidence=round(best_score, 4),
+                    match_type="token_overlap",
+                    alternatives=[],
+                )
 
         scored: list[tuple[float, dict[str, Any]]] = []
         for item in registry:
-            score = SequenceMatcher(None, normalized_target, item["normalized_company_name"]).ratio()
-            if score <= 0:
-                continue
-            scored.append((score, item))
+            best_score = 0.0
+            for normalized_target in normalized_targets:
+                sequence_score = SequenceMatcher(None, normalized_target, item["normalized_company_name"]).ratio()
+                overlap_score = self._token_overlap_score(normalized_target, item["normalized_company_name"])
+                substring_bonus = 0.08 if normalized_target in item["normalized_company_name"] else 0.0
+                best_score = max(best_score, sequence_score, overlap_score + substring_bonus)
+            if best_score > 0:
+                scored.append((best_score, item))
         scored.sort(key=lambda row: row[0], reverse=True)
 
         alternatives = [

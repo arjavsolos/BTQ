@@ -99,6 +99,8 @@ class TrialAnalysisService:
             mapping = asdict(result)
             if not mapping.get("ticker"):
                 warnings.append("Sponsor mapping did not produce a confident public ticker match.")
+            elif (mapping.get("confidence") or 0) < 0.85:
+                warnings.append("Sponsor mapping produced a low-confidence ticker match that may need review.")
             return mapping, warnings
         except Exception as exc:
             warnings.append(f"SEC sponsor mapping failed: {exc}")

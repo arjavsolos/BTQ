@@ -29,6 +29,22 @@ class SecCompanyMapperTests(unittest.TestCase):
         self.assertEqual(result.match_type, "exact_normalized")
         self.assertEqual(result.confidence, 1.0)
 
+    def test_match_sponsor_to_ticker_handles_parenthetical_sponsor_names(self) -> None:
+        mapper = SecCompanyMapper()
+        mapper._registry = [
+            {
+                "company_name": "Pfizer Inc.",
+                "normalized_company_name": mapper._normalize_company_name("Pfizer Inc."),
+                "ticker": "PFE",
+                "cik": "0000078003",
+            }
+        ]
+
+        result = mapper.match_sponsor_to_ticker("Pfizer Inc. (Lead Sponsor)")
+
+        self.assertEqual(result.ticker, "PFE")
+        self.assertIn(result.match_type, {"exact_normalized", "token_overlap"})
+
     def test_match_sponsor_to_ticker_returns_candidates_when_no_confident_match(self) -> None:
         mapper = SecCompanyMapper()
         mapper._registry = [

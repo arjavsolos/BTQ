@@ -74,6 +74,40 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
         self.assertEqual(record["approval_application_numbers"], ["NDA000001"])
         self.assertTrue(record["is_model_ready"])
         self.assertEqual(record["feature_payload"]["mapping_features"]["match_type"], "exact_normalized")
+        self.assertEqual(record["feature_payload"]["model_readiness"]["issues"], [])
+
+    def test_build_event_record_tracks_model_readiness_issues(self) -> None:
+        service = HistoricalTrialEventService()
+        analysis = {
+            "analysis_version": "1.0",
+            "trial": {
+                "nct_id": "NCT00000002",
+                "event_date_candidate": "2025-01",
+                "event_date_precision": "month",
+            },
+            "sponsor_mapping": {
+                "ticker": None,
+            },
+            "market_data": {
+                "record_count": 0,
+                "event_day_return": None,
+            },
+            "fda_context": {"approval_records": []},
+            "warnings": [],
+        }
+
+        record = service.build_event_record(analysis)
+
+        self.assertFalse(record["is_model_ready"])
+        self.assertEqual(
+            record["feature_payload"]["model_readiness"]["issues"],
+            [
+                "missing_ticker",
+                "non_day_precision_event_date",
+                "missing_market_window",
+                "missing_event_day_return",
+            ],
+        )
 
 
 if __name__ == "__main__":

@@ -173,16 +173,28 @@ class ClinicalTrialsIngestor:
         self,
         status_module: dict[str, Any],
     ) -> tuple[str | None, str | None]:
+        def precision_rank(value: str | None) -> int:
+            precision = self._infer_date_precision(value)
+            return {"day": 3, "month": 2, "year": 1}.get(precision or "", 0)
+
         candidates = [
             ("primary_completion_date", (status_module.get("primaryCompletionDateStruct") or {}).get("date")),
             ("completion_date", (status_module.get("completionDateStruct") or {}).get("date")),
             ("results_first_posted", (status_module.get("resultsFirstPostDateStruct") or {}).get("date")),
             ("last_update_posted", (status_module.get("lastUpdatePostDateStruct") or {}).get("date")),
         ]
+        best_candidate: tuple[str | None, str | None] = (None, None)
+        best_rank = -1
         for source, value in candidates:
-            if value:
+            if not value:
+                continue
+            current_rank = precision_rank(value)
+            if current_rank > best_rank:
+                best_candidate = (value, source)
+                best_rank = current_rank
+            if current_rank == 3 and source in {"primary_completion_date", "completion_date"}:
                 return value, source
-        return None, None
+        return best_candidate
 
     def _compute_completeness_flags(self, record: dict[str, Any]) -> dict[str, Any]:
         flags = {

@@ -66,7 +66,31 @@ class HistoricalTrialEventService:
                 "event_day_return": market_data.get("event_day_return"),
                 "post_window_return": market_data.get("post_window_return"),
             },
+            "model_readiness": {
+                "is_model_ready": self._derive_model_readiness_issues(analysis) == [],
+                "issues": self._derive_model_readiness_issues(analysis),
+            },
         }
+
+    def _derive_model_readiness_issues(self, analysis: dict[str, Any]) -> list[str]:
+        trial = analysis.get("trial") or {}
+        sponsor_mapping = analysis.get("sponsor_mapping") or {}
+        market_data = analysis.get("market_data") or {}
+
+        issues: list[str] = []
+        if not trial.get("nct_id"):
+            issues.append("missing_nct_id")
+        if not sponsor_mapping.get("ticker"):
+            issues.append("missing_ticker")
+        if not trial.get("event_date_candidate"):
+            issues.append("missing_event_date")
+        elif trial.get("event_date_precision") != "day":
+            issues.append("non_day_precision_event_date")
+        if not market_data.get("record_count"):
+            issues.append("missing_market_window")
+        if market_data.get("event_day_return") is None:
+            issues.append("missing_event_day_return")
+        return issues
 
     def build_event_record(
         self,
@@ -88,14 +112,8 @@ class HistoricalTrialEventService:
             [record.get("sponsor_name") for record in approval_records]
         )
 
-        is_model_ready = all(
-            [
-                trial.get("nct_id"),
-                sponsor_mapping.get("ticker"),
-                trial.get("event_date_candidate"),
-                market_data.get("record_count"),
-            ]
-        ) and market_data.get("event_day_return") is not None
+        model_readiness_issues = self._derive_model_readiness_issues(analysis)
+        is_model_ready = len(model_readiness_issues) == 0
 
         return {
             "analysis_id": analysis_id,

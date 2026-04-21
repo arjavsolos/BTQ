@@ -81,6 +81,26 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertTrue(record["has_results"])
         self.assertGreater(record["data_completeness_ratio"], 0)
 
+    def test_extract_trial_record_prefers_day_precision_event_date(self) -> None:
+        ingestor = ClinicalTrialsIngestor()
+        study = {
+            "protocolSection": {
+                "identificationModule": {"nctId": "NCT00000002"},
+                "statusModule": {
+                    "primaryCompletionDateStruct": {"date": "2025-01"},
+                    "completionDateStruct": {"date": "2025-02"},
+                    "resultsFirstPostDateStruct": {"date": "2025-02-10"},
+                    "lastUpdatePostDateStruct": {"date": "2025-02-15"},
+                },
+            }
+        }
+
+        record = ingestor.extract_trial_record(study)
+
+        self.assertEqual(record["event_date_candidate"], "2025-02-10")
+        self.assertEqual(record["event_date_source"], "results_first_posted")
+        self.assertEqual(record["event_date_precision"], "day")
+
 
 if __name__ == "__main__":
     unittest.main()
