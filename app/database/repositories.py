@@ -199,25 +199,46 @@ class ClinicalTrialsRepository:
     def list_trial_identifiers(
         self,
         limit: int = 100,
+        offset: int = 0,
         overall_status: str | None = None,
         sponsor_name: str | None = None,
+        phase_label: str | None = None,
+        study_type: str | None = None,
+        therapeutic_area: str | None = None,
         has_results: bool | None = None,
         require_event_date: bool = True,
+        exclude_existing_historical_events: bool = False,
     ) -> list[dict[str, Any]]:
         clauses = []
         params: list[Any] = []
+        join_clause = ""
 
         if overall_status:
-            clauses.append("overall_status = %s")
+            clauses.append("clinical_trials.overall_status = %s")
             params.append(overall_status)
         if sponsor_name:
-            clauses.append("sponsor_name ilike %s")
+            clauses.append("clinical_trials.sponsor_name ilike %s")
             params.append(f"%{sponsor_name}%")
+        if phase_label:
+            clauses.append("clinical_trials.phase_label = %s")
+            params.append(phase_label)
+        if study_type:
+            clauses.append("clinical_trials.study_type = %s")
+            params.append(study_type)
+        if therapeutic_area:
+            clauses.append("clinical_trials.therapeutic_area = %s")
+            params.append(therapeutic_area)
         if has_results is not None:
-            clauses.append("has_results = %s")
+            clauses.append("clinical_trials.has_results = %s")
             params.append(has_results)
         if require_event_date:
-            clauses.append("event_date_candidate is not null")
+            clauses.append("clinical_trials.event_date_candidate is not null")
+        if exclude_existing_historical_events:
+            join_clause = """
+            left join historical_trial_events hte
+                on hte.nct_id = clinical_trials.nct_id
+            """
+            clauses.append("hte.nct_id is null")
 
         where_clause = ""
         if clauses:
@@ -225,19 +246,24 @@ class ClinicalTrialsRepository:
 
         sql = f"""
         select
-            nct_id,
-            sponsor_name,
-            overall_status,
-            phase_label,
-            event_date_candidate
+            clinical_trials.nct_id,
+            clinical_trials.sponsor_name,
+            clinical_trials.overall_status,
+            clinical_trials.phase_label,
+            clinical_trials.study_type,
+            clinical_trials.therapeutic_area,
+            clinical_trials.has_results,
+            clinical_trials.event_date_candidate
         from clinical_trials
+        {join_clause}
         {where_clause}
         order by
-            event_date_candidate desc nulls last,
-            updated_at desc
-        limit %s;
+            clinical_trials.event_date_candidate desc nulls last,
+            clinical_trials.updated_at desc
+        limit %s
+        offset %s;
         """
-        params.append(max(1, limit))
+        params.extend([max(1, limit), max(0, offset)])
 
         with self.connection.cursor() as cursor:
             cursor.execute(sql, tuple(params))
@@ -249,7 +275,10 @@ class ClinicalTrialsRepository:
                 "sponsor_name": row[1],
                 "overall_status": row[2],
                 "phase_label": row[3],
-                "event_date_candidate": row[4],
+                "study_type": row[4],
+                "therapeutic_area": row[5],
+                "has_results": row[6],
+                "event_date_candidate": row[7],
             }
             for row in rows
         ]

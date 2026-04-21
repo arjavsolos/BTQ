@@ -33,13 +33,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Build historical trial-event dataset rows from stored clinical trials",
     )
     build_dataset.add_argument("--limit", type=int, default=25)
+    build_dataset.add_argument("--offset", type=int, default=0)
+    build_dataset.add_argument("--batch-size", type=int)
+    build_dataset.add_argument("--max-batches", type=int)
     build_dataset.add_argument("--approval-limit", type=int, default=5)
     build_dataset.add_argument("--market-pre-days", type=int, default=5)
     build_dataset.add_argument("--market-post-days", type=int, default=5)
     build_dataset.add_argument("--status")
     build_dataset.add_argument("--sponsor")
+    build_dataset.add_argument("--phase")
+    build_dataset.add_argument("--study-type")
+    build_dataset.add_argument("--therapeutic-area")
     build_dataset.add_argument("--has-results", action="store_true")
     build_dataset.add_argument("--without-results", action="store_true")
+    build_dataset.add_argument("--include-existing", action="store_true")
 
     audit_dataset = subparsers.add_parser(
         "audit-historical-dataset",
@@ -81,12 +88,19 @@ def main() -> None:
         service = HistoricalDatasetBackfillService()
         result = service.build_from_database(
             limit=args.limit,
+            offset=args.offset,
             approval_limit=args.approval_limit,
             market_pre_days=args.market_pre_days,
             market_post_days=args.market_post_days,
             overall_status=args.status,
             sponsor_name=args.sponsor,
+            phase_label=args.phase,
+            study_type=args.study_type,
+            therapeutic_area=args.therapeutic_area,
             has_results=False if args.without_results else (True if args.has_results else None),
+            exclude_existing_historical_events=not args.include_existing,
+            batch_size=args.batch_size,
+            max_batches=args.max_batches,
         )
         print(json.dumps(result, indent=2, ensure_ascii=True))
         return
