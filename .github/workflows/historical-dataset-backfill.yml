@@ -1,6 +1,8 @@
 name: Historical Dataset Backfill
 
 on:
+  schedule:
+    - cron: "15 9 * * 1"
   workflow_dispatch:
     inputs:
       limit:
@@ -124,6 +126,36 @@ jobs:
       HISTORICAL_DATASET_HAS_RESULTS: ${{ inputs.has_results }}
       HISTORICAL_DATASET_WITHOUT_RESULTS: ${{ inputs.without_results }}
       HISTORICAL_DATASET_INCLUDE_EXISTING: ${{ inputs.include_existing }}
+      INPUT_LIMIT: ${{ inputs.limit }}
+      INPUT_OFFSET: ${{ inputs.offset }}
+      INPUT_BATCH_SIZE: ${{ inputs.batch_size }}
+      INPUT_MAX_BATCHES: ${{ inputs.max_batches }}
+      INPUT_APPROVAL_LIMIT: ${{ inputs.approval_limit }}
+      INPUT_MARKET_PRE_DAYS: ${{ inputs.market_pre_days }}
+      INPUT_MARKET_POST_DAYS: ${{ inputs.market_post_days }}
+      INPUT_STATUS: ${{ inputs.status }}
+      INPUT_SPONSOR: ${{ inputs.sponsor }}
+      INPUT_PHASE: ${{ inputs.phase }}
+      INPUT_STUDY_TYPE: ${{ inputs.study_type }}
+      INPUT_THERAPEUTIC_AREA: ${{ inputs.therapeutic_area }}
+      INPUT_HAS_RESULTS: ${{ inputs.has_results }}
+      INPUT_WITHOUT_RESULTS: ${{ inputs.without_results }}
+      INPUT_INCLUDE_EXISTING: ${{ inputs.include_existing }}
+      DEFAULT_LIMIT: ${{ vars.HISTORICAL_DATASET_LIMIT }}
+      DEFAULT_OFFSET: ${{ vars.HISTORICAL_DATASET_OFFSET }}
+      DEFAULT_BATCH_SIZE: ${{ vars.HISTORICAL_DATASET_BATCH_SIZE }}
+      DEFAULT_MAX_BATCHES: ${{ vars.HISTORICAL_DATASET_MAX_BATCHES }}
+      DEFAULT_APPROVAL_LIMIT: ${{ vars.HISTORICAL_DATASET_APPROVAL_LIMIT }}
+      DEFAULT_MARKET_PRE_DAYS: ${{ vars.HISTORICAL_DATASET_MARKET_PRE_DAYS }}
+      DEFAULT_MARKET_POST_DAYS: ${{ vars.HISTORICAL_DATASET_MARKET_POST_DAYS }}
+      DEFAULT_STATUS: ${{ vars.HISTORICAL_DATASET_STATUS }}
+      DEFAULT_SPONSOR: ${{ vars.HISTORICAL_DATASET_SPONSOR }}
+      DEFAULT_PHASE: ${{ vars.HISTORICAL_DATASET_PHASE }}
+      DEFAULT_STUDY_TYPE: ${{ vars.HISTORICAL_DATASET_STUDY_TYPE }}
+      DEFAULT_THERAPEUTIC_AREA: ${{ vars.HISTORICAL_DATASET_THERAPEUTIC_AREA }}
+      DEFAULT_HAS_RESULTS: ${{ vars.HISTORICAL_DATASET_HAS_RESULTS }}
+      DEFAULT_WITHOUT_RESULTS: ${{ vars.HISTORICAL_DATASET_WITHOUT_RESULTS }}
+      DEFAULT_INCLUDE_EXISTING: ${{ vars.HISTORICAL_DATASET_INCLUDE_EXISTING }}
 
     steps:
       - name: Check out repository
@@ -165,6 +197,58 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
+      - name: Resolve effective historical dataset configuration
+        id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          resolve_value() {
+            local input_value="${1:-}"
+            local default_value="${2:-}"
+            local fallback_value="${3:-}"
+
+            if [ -n "${input_value}" ]; then
+              printf '%s' "${input_value}"
+            elif [ -n "${default_value}" ]; then
+              printf '%s' "${default_value}"
+            else
+              printf '%s' "${fallback_value}"
+            fi
+          }
+
+          limit="$(resolve_value "${INPUT_LIMIT:-}" "${DEFAULT_LIMIT:-}" "25")"
+          offset="$(resolve_value "${INPUT_OFFSET:-}" "${DEFAULT_OFFSET:-}" "0")"
+          batch_size="$(resolve_value "${INPUT_BATCH_SIZE:-}" "${DEFAULT_BATCH_SIZE:-}" "")"
+          max_batches="$(resolve_value "${INPUT_MAX_BATCHES:-}" "${DEFAULT_MAX_BATCHES:-}" "")"
+          approval_limit="$(resolve_value "${INPUT_APPROVAL_LIMIT:-}" "${DEFAULT_APPROVAL_LIMIT:-}" "5")"
+          market_pre_days="$(resolve_value "${INPUT_MARKET_PRE_DAYS:-}" "${DEFAULT_MARKET_PRE_DAYS:-}" "5")"
+          market_post_days="$(resolve_value "${INPUT_MARKET_POST_DAYS:-}" "${DEFAULT_MARKET_POST_DAYS:-}" "5")"
+          status="$(resolve_value "${INPUT_STATUS:-}" "${DEFAULT_STATUS:-}" "COMPLETED")"
+          sponsor="$(resolve_value "${INPUT_SPONSOR:-}" "${DEFAULT_SPONSOR:-}" "")"
+          phase="$(resolve_value "${INPUT_PHASE:-}" "${DEFAULT_PHASE:-}" "")"
+          study_type="$(resolve_value "${INPUT_STUDY_TYPE:-}" "${DEFAULT_STUDY_TYPE:-}" "")"
+          therapeutic_area="$(resolve_value "${INPUT_THERAPEUTIC_AREA:-}" "${DEFAULT_THERAPEUTIC_AREA:-}" "")"
+          has_results="$(resolve_value "${INPUT_HAS_RESULTS:-}" "${DEFAULT_HAS_RESULTS:-}" "true")"
+          without_results="$(resolve_value "${INPUT_WITHOUT_RESULTS:-}" "${DEFAULT_WITHOUT_RESULTS:-}" "false")"
+          include_existing="$(resolve_value "${INPUT_INCLUDE_EXISTING:-}" "${DEFAULT_INCLUDE_EXISTING:-}" "false")"
+
+          echo "limit=${limit}" >> "$GITHUB_OUTPUT"
+          echo "offset=${offset}" >> "$GITHUB_OUTPUT"
+          echo "batch_size=${batch_size}" >> "$GITHUB_OUTPUT"
+          echo "max_batches=${max_batches}" >> "$GITHUB_OUTPUT"
+          echo "approval_limit=${approval_limit}" >> "$GITHUB_OUTPUT"
+          echo "market_pre_days=${market_pre_days}" >> "$GITHUB_OUTPUT"
+          echo "market_post_days=${market_post_days}" >> "$GITHUB_OUTPUT"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "sponsor=${sponsor}" >> "$GITHUB_OUTPUT"
+          echo "phase=${phase}" >> "$GITHUB_OUTPUT"
+          echo "study_type=${study_type}" >> "$GITHUB_OUTPUT"
+          echo "therapeutic_area=${therapeutic_area}" >> "$GITHUB_OUTPUT"
+          echo "has_results=${has_results}" >> "$GITHUB_OUTPUT"
+          echo "without_results=${without_results}" >> "$GITHUB_OUTPUT"
+          echo "include_existing=${include_existing}" >> "$GITHUB_OUTPUT"
+
       - name: Initialize database schema
         shell: bash
         run: |
@@ -173,6 +257,22 @@ jobs:
 
       - name: Run historical dataset backfill
         shell: bash
+        env:
+          HISTORICAL_DATASET_LIMIT: ${{ steps.config.outputs.limit }}
+          HISTORICAL_DATASET_OFFSET: ${{ steps.config.outputs.offset }}
+          HISTORICAL_DATASET_BATCH_SIZE: ${{ steps.config.outputs.batch_size }}
+          HISTORICAL_DATASET_MAX_BATCHES: ${{ steps.config.outputs.max_batches }}
+          HISTORICAL_DATASET_APPROVAL_LIMIT: ${{ steps.config.outputs.approval_limit }}
+          HISTORICAL_DATASET_MARKET_PRE_DAYS: ${{ steps.config.outputs.market_pre_days }}
+          HISTORICAL_DATASET_MARKET_POST_DAYS: ${{ steps.config.outputs.market_post_days }}
+          HISTORICAL_DATASET_STATUS: ${{ steps.config.outputs.status }}
+          HISTORICAL_DATASET_SPONSOR: ${{ steps.config.outputs.sponsor }}
+          HISTORICAL_DATASET_PHASE: ${{ steps.config.outputs.phase }}
+          HISTORICAL_DATASET_STUDY_TYPE: ${{ steps.config.outputs.study_type }}
+          HISTORICAL_DATASET_THERAPEUTIC_AREA: ${{ steps.config.outputs.therapeutic_area }}
+          HISTORICAL_DATASET_HAS_RESULTS: ${{ steps.config.outputs.has_results }}
+          HISTORICAL_DATASET_WITHOUT_RESULTS: ${{ steps.config.outputs.without_results }}
+          HISTORICAL_DATASET_INCLUDE_EXISTING: ${{ steps.config.outputs.include_existing }}
         run: |
           set -euo pipefail
           mkdir -p logs
@@ -186,11 +286,28 @@ jobs:
           printf '%s\n' "$output" > logs/historical_dataset_backfill_output.json
           exit "$status"
 
+      - name: Run post-backfill audit
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+
+          printf '%s\n' "Running command: python scripts/audit_historical_dataset.py" | tee logs/historical_dataset_audit.log
+          set +e
+          output="$(python scripts/audit_historical_dataset.py 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output" | tee -a logs/historical_dataset_audit.log
+          printf '%s\n' "$output" > logs/historical_dataset_audit_output.json
+          exit 0
+
       - name: Publish workflow summary
         if: always()
         shell: bash
         env:
           HISTORICAL_DATASET_OUTPUT_PATH: logs/historical_dataset_backfill_output.json
+          HISTORICAL_AUDIT_OUTPUT_PATH: logs/historical_dataset_audit_output.json
         run: |
           set -euo pipefail
 
@@ -198,23 +315,27 @@ jobs:
             echo "## Historical Dataset Backfill"
             echo
             echo "- Trigger: ${{ github.event_name }}"
-            echo "- Limit: \`${{ inputs.limit }}\`"
-            echo "- Offset: \`${{ inputs.offset }}\`"
-            echo "- Batch size: \`${{ inputs.batch_size || '(auto)' }}\`"
-            echo "- Max batches: \`${{ inputs.max_batches || '(all)' }}\`"
-            echo "- Approval limit: \`${{ inputs.approval_limit }}\`"
-            echo "- Market pre days: \`${{ inputs.market_pre_days }}\`"
-            echo "- Market post days: \`${{ inputs.market_post_days }}\`"
-            echo "- Status filter: \`${{ inputs.status }}\`"
-            echo "- Sponsor filter: \`${{ inputs.sponsor || '(none)' }}\`"
-            echo "- Phase filter: \`${{ inputs.phase || '(none)' }}\`"
-            echo "- Study type filter: \`${{ inputs.study_type || '(none)' }}\`"
-            echo "- Therapeutic area filter: \`${{ inputs.therapeutic_area || '(none)' }}\`"
-            echo "- Has results: \`${{ inputs.has_results }}\`"
-            echo "- Without results: \`${{ inputs.without_results }}\`"
-            echo "- Include existing: \`${{ inputs.include_existing }}\`"
+            echo "- Limit: \`${{ steps.config.outputs.limit }}\`"
+            echo "- Offset: \`${{ steps.config.outputs.offset }}\`"
+            echo "- Batch size: \`${{ steps.config.outputs.batch_size || '(auto)' }}\`"
+            echo "- Max batches: \`${{ steps.config.outputs.max_batches || '(all)' }}\`"
+            echo "- Approval limit: \`${{ steps.config.outputs.approval_limit }}\`"
+            echo "- Market pre days: \`${{ steps.config.outputs.market_pre_days }}\`"
+            echo "- Market post days: \`${{ steps.config.outputs.market_post_days }}\`"
+            echo "- Status filter: \`${{ steps.config.outputs.status }}\`"
+            echo "- Sponsor filter: \`${{ steps.config.outputs.sponsor || '(none)' }}\`"
+            echo "- Phase filter: \`${{ steps.config.outputs.phase || '(none)' }}\`"
+            echo "- Study type filter: \`${{ steps.config.outputs.study_type || '(none)' }}\`"
+            echo "- Therapeutic area filter: \`${{ steps.config.outputs.therapeutic_area || '(none)' }}\`"
+            echo "- Has results: \`${{ steps.config.outputs.has_results }}\`"
+            echo "- Without results: \`${{ steps.config.outputs.without_results }}\`"
+            echo "- Include existing: \`${{ steps.config.outputs.include_existing }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -f logs/historical_dataset_backfill_output.json ]; then
             python scripts/publish_historical_dataset_backfill_summary.py
+          fi
+
+          if [ -f logs/historical_dataset_audit_output.json ]; then
+            python scripts/publish_historical_dataset_audit_summary.py
           fi
