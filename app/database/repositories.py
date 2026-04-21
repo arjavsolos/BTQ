@@ -436,6 +436,181 @@ class HistoricalTrialEventRepository:
             for row in rows
         ]
 
+    def get_quality_summary(self) -> dict[str, Any]:
+        sql = """
+        select
+            count(*) as total_events,
+            count(*) filter (where is_model_ready) as model_ready_events,
+            count(*) filter (where mapped_ticker is null or btrim(mapped_ticker) = '') as missing_ticker_events,
+            count(*) filter (where event_date_candidate is null or btrim(event_date_candidate) = '') as missing_event_date_events,
+            count(*) filter (where market_record_count is null or market_record_count = 0) as missing_market_data_events,
+            count(*) filter (where event_day_return is null) as missing_event_return_events,
+            count(*) filter (where approval_record_count = 0) as missing_fda_context_events,
+            count(*) filter (where warning_count > 0) as warning_events,
+            count(*) filter (where mapping_confidence is null) as missing_mapping_confidence_events,
+            count(*) filter (where mapping_confidence is not null and mapping_confidence < 0.8) as low_confidence_mapping_events,
+            count(*) filter (where data_completeness_ratio is null or data_completeness_ratio < 0.7) as low_completeness_events,
+            avg(data_completeness_ratio) as average_data_completeness_ratio,
+            avg(mapping_confidence) as average_mapping_confidence,
+            avg(event_day_return) as average_event_day_return,
+            avg(post_window_return) as average_post_window_return
+        from historical_trial_events;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            row = cursor.fetchone()
+        return {
+            "total_events": row[0],
+            "model_ready_events": row[1],
+            "missing_ticker_events": row[2],
+            "missing_event_date_events": row[3],
+            "missing_market_data_events": row[4],
+            "missing_event_return_events": row[5],
+            "missing_fda_context_events": row[6],
+            "warning_events": row[7],
+            "missing_mapping_confidence_events": row[8],
+            "low_confidence_mapping_events": row[9],
+            "low_completeness_events": row[10],
+            "average_data_completeness_ratio": row[11],
+            "average_mapping_confidence": row[12],
+            "average_event_day_return": row[13],
+            "average_post_window_return": row[14],
+        }
+
+    def get_phase_breakdown(self) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(nullif(phase_label, ''), 'UNKNOWN') as phase_label,
+            count(*) as event_count,
+            count(*) filter (where is_model_ready) as model_ready_count
+        from historical_trial_events
+        group by 1
+        order by event_count desc, phase_label asc;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        return [
+            {
+                "phase_label": row[0],
+                "event_count": row[1],
+                "model_ready_count": row[2],
+            }
+            for row in rows
+        ]
+
+    def get_therapeutic_area_breakdown(self, limit: int = 10) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(nullif(therapeutic_area, ''), 'UNKNOWN') as therapeutic_area,
+            count(*) as event_count,
+            count(*) filter (where is_model_ready) as model_ready_count
+        from historical_trial_events
+        group by 1
+        order by event_count desc, therapeutic_area asc
+        limit %s;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (max(1, limit),))
+            rows = cursor.fetchall()
+        return [
+            {
+                "therapeutic_area": row[0],
+                "event_count": row[1],
+                "model_ready_count": row[2],
+            }
+            for row in rows
+        ]
+
+    def get_event_date_precision_breakdown(self) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(nullif(event_date_precision, ''), 'UNKNOWN') as event_date_precision,
+            count(*) as event_count
+        from historical_trial_events
+        group by 1
+        order by event_count desc, event_date_precision asc;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        return [
+            {
+                "event_date_precision": row[0],
+                "event_count": row[1],
+            }
+            for row in rows
+        ]
+
+    def get_warning_frequency(self, limit: int = 10) -> list[dict[str, Any]]:
+        sql = """
+        select
+            warning_text,
+            count(*) as warning_count
+        from (
+            select jsonb_array_elements_text(warnings) as warning_text
+            from historical_trial_events
+            where jsonb_array_length(warnings) > 0
+        ) expanded
+        group by warning_text
+        order by warning_count desc, warning_text asc
+        limit %s;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (max(1, limit),))
+            rows = cursor.fetchall()
+        return [
+            {
+                "warning": row[0],
+                "warning_count": row[1],
+            }
+            for row in rows
+        ]
+
+    def get_recent_issues(self, limit: int = 25) -> list[dict[str, Any]]:
+        sql = """
+        select
+            event_id,
+            nct_id,
+            sponsor_name,
+            mapped_ticker,
+            event_date_candidate,
+            is_model_ready,
+            warning_count,
+            mapping_confidence,
+            data_completeness_ratio,
+            event_day_return,
+            created_at
+        from historical_trial_events
+        where
+            not is_model_ready
+            or warning_count > 0
+            or mapped_ticker is null
+            or event_date_candidate is null
+            or event_day_return is null
+        order by created_at desc
+        limit %s;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (max(1, limit),))
+            rows = cursor.fetchall()
+        return [
+            {
+                "event_id": row[0],
+                "nct_id": row[1],
+                "sponsor_name": row[2],
+                "mapped_ticker": row[3],
+                "event_date_candidate": row[4],
+                "is_model_ready": row[5],
+                "warning_count": row[6],
+                "mapping_confidence": row[7],
+                "data_completeness_ratio": row[8],
+                "event_day_return": row[9],
+                "created_at": str(row[10]),
+            }
+            for row in rows
+        ]
+
 
 def initialize_database() -> None:
     with get_connection() as connection:

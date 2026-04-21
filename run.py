@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.database.repositories import initialize_database
-from app.services import HistoricalDatasetBackfillService, TrialAnalysisService
+from app.services import HistoricalDatasetAuditService, HistoricalDatasetBackfillService, TrialAnalysisService
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,6 +40,14 @@ def build_parser() -> argparse.ArgumentParser:
     build_dataset.add_argument("--sponsor")
     build_dataset.add_argument("--has-results", action="store_true")
     build_dataset.add_argument("--without-results", action="store_true")
+
+    audit_dataset = subparsers.add_parser(
+        "audit-historical-dataset",
+        help="Audit the historical trial-event dataset for completeness and model readiness",
+    )
+    audit_dataset.add_argument("--top-warning-limit", type=int, default=10)
+    audit_dataset.add_argument("--issue-limit", type=int, default=25)
+    audit_dataset.add_argument("--therapeutic-area-limit", type=int, default=10)
     return parser
 
 
@@ -79,6 +87,16 @@ def main() -> None:
             overall_status=args.status,
             sponsor_name=args.sponsor,
             has_results=False if args.without_results else (True if args.has_results else None),
+        )
+        print(json.dumps(result, indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "audit-historical-dataset":
+        service = HistoricalDatasetAuditService()
+        result = service.audit_dataset(
+            top_warning_limit=args.top_warning_limit,
+            issue_limit=args.issue_limit,
+            therapeutic_area_limit=args.therapeutic_area_limit,
         )
         print(json.dumps(result, indent=2, ensure_ascii=True))
         return
