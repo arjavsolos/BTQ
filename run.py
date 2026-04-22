@@ -12,10 +12,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.database import get_connection
-from app.database.repositories import SponsorMappingReviewRepository
-from app.database.repositories import initialize_database
+from app.database.repositories import SponsorMappingReviewRepository, initialize_database
 from app.research import build_methodology_snapshot, render_methodology_markdown
-from app.services import HistoricalDatasetAuditService, HistoricalDatasetBackfillService, TrialAnalysisService
+from app.services import (
+    HistoricalDatasetAuditService,
+    HistoricalDatasetBackfillService,
+    TrialAnalysisService,
+)
 
 
 def _build_sponsor_mapping_review_export_summary(reviews: list[dict[str, Any]]) -> dict[str, Any]:
