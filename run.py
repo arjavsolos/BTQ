@@ -3,15 +3,30 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.database import get_connection
+from app.database.repositories import SponsorMappingReviewRepository
 from app.database.repositories import initialize_database
 from app.research import build_methodology_snapshot, render_methodology_markdown
 from app.services import HistoricalDatasetAuditService, HistoricalDatasetBackfillService, TrialAnalysisService
+
+
+def _build_sponsor_mapping_review_export_summary(reviews: list[dict[str, Any]]) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    for review in reviews:
+        status = str(review.get("review_status") or "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+    return {
+        "exported_review_count": len(reviews),
+        "status_counts": status_counts,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,6 +77,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the project methodology in JSON or Markdown form",
     )
     describe_methodology.add_argument("--format", choices=["json", "markdown"], default="json")
+
+    export_sponsor_mapping_reviews = subparsers.add_parser(
+        "export-sponsor-mapping-reviews",
+        help="Export sponsor mapping review rows in JSON or JSONL format",
+    )
+    export_sponsor_mapping_reviews.add_argument("--limit", type=int, default=100)
+    export_sponsor_mapping_reviews.add_argument("--offset", type=int, default=0)
+    export_sponsor_mapping_reviews.add_argument("--review-status")
+    export_sponsor_mapping_reviews.add_argument("--suggested-ticker")
+    export_sponsor_mapping_reviews.add_argument("--reviewer-email")
+    export_sponsor_mapping_reviews.add_argument("--format", choices=["json", "jsonl"], default="json")
+    export_sponsor_mapping_reviews.add_argument("--include-summary", action="store_true")
     return parser
 
 
@@ -127,6 +154,42 @@ def main() -> None:
             print(render_methodology_markdown())
             return
         print(json.dumps(build_methodology_snapshot(), indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "export-sponsor-mapping-reviews":
+        with get_connection() as connection:
+            repository = SponsorMappingReviewRepository(connection)
+            repository.create_tables()
+            reviews = repository.list_reviews(
+                limit=args.limit,
+                offset=args.offset,
+                review_status=args.review_status,
+                suggested_ticker=args.suggested_ticker,
+                reviewer_email=args.reviewer_email,
+            )
+
+        if args.format == "jsonl":
+            for review in reviews:
+                print(json.dumps(review, ensure_ascii=True))
+            return
+
+        payload: dict[str, Any] = {
+            "status": "success",
+            "generated_at": datetime.now(UTC).isoformat(),
+            "input": {
+                "limit": args.limit,
+                "offset": args.offset,
+                "review_status": args.review_status,
+                "suggested_ticker": args.suggested_ticker,
+                "reviewer_email": args.reviewer_email,
+                "format": args.format,
+                "include_summary": args.include_summary,
+            },
+            "reviews": reviews,
+        }
+        if args.include_summary:
+            payload["summary"] = _build_sponsor_mapping_review_export_summary(reviews)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
         return
 
     raise SystemExit(f"Unknown command: {args.command}")
