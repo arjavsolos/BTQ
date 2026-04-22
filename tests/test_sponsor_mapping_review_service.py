@@ -121,7 +121,10 @@ class SponsorMappingReviewServiceTests(unittest.TestCase):
         repository = _RepositoryStub()
 
         with (
-            patch("app.services.sponsor_mapping_review_service.get_connection", return_value=_ConnectionStub(repository)),
+            patch(
+                "app.services.sponsor_mapping_review_service.get_connection",
+                return_value=_ConnectionStub(repository),
+            ),
             patch(
                 "app.services.sponsor_mapping_review_service.SponsorMappingReviewRepository",
                 return_value=repository,
