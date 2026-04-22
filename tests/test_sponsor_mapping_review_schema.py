@@ -10,7 +10,12 @@ from app.database.schemas import (
 
 
 class _FakeCursor:
-    def __init__(self, executed: list[tuple[str, object | None]], fetchone_results: list[tuple], fetchall_results: list[list[tuple]]) -> None:
+    def __init__(
+        self,
+        executed: list[tuple[str, object | None]],
+        fetchone_results: list[tuple],
+        fetchall_results: list[list[tuple]],
+    ) -> None:
         self.executed = executed
         self.fetchone_results = fetchone_results
         self.fetchall_results = fetchall_results
