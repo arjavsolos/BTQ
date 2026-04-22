@@ -1,131 +1,244 @@
 # Methodology
 
-## What The Clinical Trials Ingestor Does
+This document defines the formal research and dataset methodology for BTQ.
 
-The ClinicalTrials.gov ingestion layer converts the raw v2 API payload into a normalized trial record for downstream analytics.
+The code-backed version of this methodology lives in:
 
-The normalized record contains:
+- `app/research/methodology.py`
 
-- identifier metadata
-- sponsor metadata
-- trial design metadata
-- enrollment and eligibility metadata
-- condition and intervention metadata
-- endpoint metadata
-- date and catalyst metadata
-- geography and site metadata
-- literature and signal metadata
+You can export the current canonical methodology with:
 
-## Why This Matters
+```bash
+python run.py describe-methodology --format markdown
+```
 
-ClinicalTrials.gov returns deeply nested JSON that is hard to store and hard to model against directly.
+## End Goal
 
-The ingestor solves that by translating one raw study object into a row-like structure that can feed:
+BTQ is designed to become a research-grade biotech event intelligence system. Its purpose is to transform clinical trial metadata, sponsor identity resolution, regulatory context, and market reaction data into a structured historical dataset that can support:
 
-- database storage
-- sponsor resolution
-- prior estimation
-- event-study backtesting
-- later probability models
+- catalyst research
+- historical event studies
+- dataset quality auditing
+- future predictive and probabilistic modeling
 
-## Event Modeling Relevance
+The project is intentionally staged. Today it is strongest as a data and methodology platform. Over time it is intended to become a stronger research engine for analyzing whether biotech trial events produce repeatable market patterns.
 
-The most important fields for the broader project are:
+## Core Research Principle
 
-- `nct_id`
-- `sponsor_name`
+The system should not silently drop ambiguous data just because the row is imperfect.
+
+Instead, BTQ follows a more rigorous principle:
+
+- keep rows when they can still be normalized
+- label uncertainty explicitly
+- surface warnings and completeness metrics
+- decide model readiness based on observable criteria
+
+That approach makes the dataset far more useful for research because it preserves both coverage and auditability.
+
+## Unit Of Analysis
+
+The main research unit is a historical trial-event row.
+
+One row combines:
+
+- a canonical `nct_id`
+- a normalized ClinicalTrials.gov trial record
+- a chosen `event_date_candidate`
+- an `event_date_source`
+- an event-date precision label
+- a sponsor-to-ticker mapping result
+- sponsor-linked OpenFDA approval context
+- a market event window around the selected date
+- warnings and completeness signals
+- a model-readiness label
+
+This means the project is not merely storing raw trials. It is constructing research-ready event observations.
+
+## Inclusion Criteria
+
+Trials are eligible for the normalized dataset when:
+
+- they have a canonical ClinicalTrials.gov NCT identifier
+- they can be transformed into the canonical `clinical_trials` record shape
+- the source payload contains enough structure to preserve identifiers, sponsor metadata, and trial design metadata
+
+Trials are eligible for historical event construction when:
+
+- they are already stored in the database or available through the analysis pipeline
+- they have an event-date candidate that can be recorded, even if that date is only partial precision
+- they can be analyzed end to end through the existing services
+
+Backfill runs may apply additional filters such as:
+
 - `overall_status`
+- `phase`
 - `study_type`
-- `phases`
-- `enrollment_count`
+- `sponsor`
 - `therapeutic_area`
-- `intervention_types`
-- `primary_endpoint_measures`
 - `has_results`
-- `event_date_candidate`
-- `us_site_count`
-- `keyword_hits`
 
-These fields help approximate:
+## Exclusion Criteria
 
-- trial maturity
-- trial complexity
-- sponsor context
-- potential catalyst timing
-- disease-area grouping
-- operational footprint
-- likely market relevance
+Trials are excluded from canonical storage or event construction when:
 
-## What To Finish Next
+- the system cannot determine a canonical `nct_id`
+- the source record is too malformed to normalize into the expected contract
 
-### 1. Stabilize the schema
+Trials may still remain in the historical dataset but be excluded from specific downstream calculations:
 
-Make sure the output of `extract_trial_record()` is treated as a formal contract.
+- non-day-precision event dates are excluded from market event-window return calculations
+- unresolved sponsor mappings are excluded from ticker-based market enrichment
+- missing market records prevent event-return calculations but do not force row deletion
 
-Do this by:
+This is important: exclusion from one enrichment stage does not automatically mean exclusion from the full dataset.
 
-- keeping field names stable
-- deciding which fields are mandatory
-- documenting which fields are nullable
+## Event-Date Methodology
 
-### 2. Improve event-date logic
+ClinicalTrials.gov does not directly guarantee the exact public market-moving announcement date for every study. Because of that, BTQ uses a transparent event-date proxy method.
 
-`event_date_candidate` is useful, but it is still heuristic.
-
-Add:
-
-- `event_date_source`
-- clearer precedence rules
-
-Recommended precedence:
+The current precedence order is:
 
 1. `primary_completion_date`
 2. `completion_date`
 3. `results_first_posted`
 4. `last_update_posted`
 
-### 3. Add completeness flags
+The system also prefers higher precision over lower precision:
 
-Examples:
+- day precision is preferred over month precision
+- month precision is preferred over year precision
+- if a lower-ranked field has better precision than a higher-ranked field, the higher-precision candidate may be selected
 
-- `has_primary_outcomes`
-- `has_locations`
-- `has_sponsor`
-- `has_interventions`
-- `has_reference_support`
+Every chosen event-date proxy is stored with:
 
-These make later filtering much easier.
+- `event_date_candidate`
+- `event_date_source`
+- `event_date_precision`
 
-### 4. Add targeted search filters
+This is one of the most important methodological safeguards in the entire project because it prevents hidden assumptions about catalyst timing.
 
-Extend the trial query object to support:
+## Sponsor-Mapping Methodology
 
-- sponsor filters
-- condition filters
-- intervention filters
-- result availability filters
+Clinical trial registries use raw sponsor text. Financial analysis requires public-market entities. BTQ bridges that gap through a staged sponsor-mapping pipeline.
 
-### 5. Persist records into the database
+The current process includes:
 
-Once the shape is stable, stop thinking of the ingestor as terminal output and start treating it as a real data source.
+- string normalization
+- parenthetical cleanup
+- symbol normalization such as converting `&` to `and`
+- candidate name generation
+- exact normalized-name matching
+- token-overlap scoring
+- fuzzy similarity scoring
 
-That means:
+The system is deliberately conservative:
 
-- fetch
-- normalize
-- upsert into `clinical_trials`
+- if no reliable mapping is found, it does not invent one
+- if a mapping exists but confidence is low, it raises a warning
+- dataset audits measure how often low-confidence mappings occur
 
-### 6. Build sponsor mapping after that
+This makes the system more credible for research, because it is better to preserve uncertainty than to hide it.
 
-Use `sponsor_name` from the normalized trial record as the input to the mapping layer.
+## Dataset Quality And QA Metrics
 
-## Completion Standard
+BTQ treats dataset QA as a first-class feature.
 
-The ClinicalTrials ingestion layer is "finished enough" when:
+At the trial level, the system tracks fields such as:
 
-- it reliably fetches and paginates studies
-- the normalized output schema is stable
-- canonical `nct_id` handling is clear
-- event-date logic is explicit
-- missing fields do not break extraction
-- the records can be inserted into the database without manual cleanup
+- `data_completeness_score`
+- `data_completeness_ratio`
+- `warning_count`
+- `mapping_confidence`
+- `approval_record_count`
+- `market_record_count`
+- `event_date_precision`
+- `is_model_ready`
+
+At the historical dataset level, the audit layer tracks metrics such as:
+
+- `model_ready_ratio`
+- `missing_ticker_ratio`
+- `missing_event_date_ratio`
+- `missing_market_data_ratio`
+- `missing_event_return_ratio`
+- `missing_fda_context_ratio`
+- `low_confidence_mapping_ratio`
+- `low_completeness_ratio`
+- `warning_event_ratio`
+
+This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
+
+## Model-Ready Definition
+
+A historical event row is currently treated as model-ready only when it has:
+
+- a canonical `nct_id`
+- a mapped ticker
+- an event date candidate
+- day-precision event timing
+- an aligned market window
+- a computed event-day return
+
+Anything short of that is still useful, but it should be treated as an incomplete research row rather than a training-quality example.
+
+## Current Evaluation State
+
+The current project already supports:
+
+- single-trial end-to-end analysis
+- persistence of analysis snapshots
+- construction of historical trial-event rows
+- historical dataset backfilling from stored trials
+- audit reporting on data quality and model readiness
+- manual and scheduled GitHub Actions workflows
+
+That means the project has crossed the threshold from prototype code into a reproducible research pipeline.
+
+## What Still Needs To Happen For Strong Quant Claims
+
+The system is not yet at the stage where it can honestly claim a robust tradable edge.
+
+To make stronger quant and biotech claims, the next research steps should be:
+
+- build a larger historical dataset
+- lock explicit inclusion and exclusion rules for the study universe
+- benchmark sponsor mapping against reviewed examples
+- evaluate event-date proxy quality against known announcement dates when possible
+- produce descriptive backtests across the stored event set
+- separate exploratory findings from out-of-sample validation
+
+That sequence matters because strong claims without dataset validation would weaken the credibility of the whole project.
+
+## Limitations
+
+The project currently has several real limitations:
+
+- ClinicalTrials.gov milestone dates are often proxies rather than exact public catalyst dates.
+- Sponsor names do not always map cleanly to a tradeable public parent.
+- Free market data can miss detail that matters for event studies.
+- OpenFDA sponsor context is helpful but not a complete approval-history model.
+- Current outputs are best understood as research infrastructure, not live trading signals.
+
+These limitations do not make the project weak. They just define the boundary of what can be claimed honestly.
+
+## Why This Methodology Matters
+
+This methodology turns the project from “some API scripts” into a real research system.
+
+It gives BTQ:
+
+- a clear end goal
+- explicit inclusion and exclusion logic
+- traceable event-date selection
+- an auditable sponsor-mapping process
+- measurable QA standards
+- a principled definition of model readiness
+- careful boundaries around financial claims
+
+That is exactly what makes the project stronger for:
+
+- recruiters
+- research credibility
+- future productization
+- eventual paper-writing

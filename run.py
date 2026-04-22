@@ -10,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.database.repositories import initialize_database
+from app.research import build_methodology_snapshot, render_methodology_markdown
 from app.services import HistoricalDatasetAuditService, HistoricalDatasetBackfillService, TrialAnalysisService
 
 
@@ -55,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
     audit_dataset.add_argument("--top-warning-limit", type=int, default=10)
     audit_dataset.add_argument("--issue-limit", type=int, default=25)
     audit_dataset.add_argument("--therapeutic-area-limit", type=int, default=10)
+
+    describe_methodology = subparsers.add_parser(
+        "describe-methodology",
+        help="Print the project methodology in JSON or Markdown form",
+    )
+    describe_methodology.add_argument("--format", choices=["json", "markdown"], default="json")
     return parser
 
 
@@ -113,6 +120,13 @@ def main() -> None:
             therapeutic_area_limit=args.therapeutic_area_limit,
         )
         print(json.dumps(result, indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "describe-methodology":
+        if args.format == "markdown":
+            print(render_methodology_markdown())
+            return
+        print(json.dumps(build_methodology_snapshot(), indent=2, ensure_ascii=True))
         return
 
     raise SystemExit(f"Unknown command: {args.command}")
