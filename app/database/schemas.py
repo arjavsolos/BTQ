@@ -196,3 +196,54 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
     ),
     "create index if not exists historical_trial_events_created_at_idx on historical_trial_events (created_at desc);",
 ]
+
+
+SPONSOR_MAPPING_REVIEWS_TABLE_SQL = """
+create table if not exists sponsor_mapping_reviews (
+  review_id bigserial primary key,
+  sponsor_name text not null,
+  normalized_sponsor_name text not null,
+  source_nct_id text references clinical_trials (nct_id) on delete set null,
+  suggested_company_name text,
+  suggested_ticker text,
+  suggested_cik text,
+  suggested_confidence double precision,
+  suggested_match_type text,
+  alternatives jsonb not null default '[]'::jsonb,
+  review_status text not null default 'pending',
+  reviewed_company_name text,
+  reviewed_ticker text,
+  reviewed_cik text,
+  reviewer_name text,
+  reviewer_email text,
+  review_notes text,
+  reviewed_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (normalized_sponsor_name)
+);
+"""
+
+
+SPONSOR_MAPPING_REVIEWS_INDEX_SQL = [
+    (
+        "create index if not exists sponsor_mapping_reviews_review_status_idx "
+        "on sponsor_mapping_reviews (review_status);"
+    ),
+    (
+        "create index if not exists sponsor_mapping_reviews_suggested_ticker_idx "
+        "on sponsor_mapping_reviews (suggested_ticker);"
+    ),
+    (
+        "create index if not exists sponsor_mapping_reviews_source_nct_id_idx "
+        "on sponsor_mapping_reviews (source_nct_id);"
+    ),
+    (
+        "create index if not exists sponsor_mapping_reviews_reviewed_ticker_idx "
+        "on sponsor_mapping_reviews (reviewed_ticker);"
+    ),
+    (
+        "create index if not exists sponsor_mapping_reviews_created_at_idx "
+        "on sponsor_mapping_reviews (created_at desc);"
+    ),
+]

@@ -7,6 +7,8 @@ from app.database.schemas import (
     CLINICAL_TRIALS_TABLE_SQL,
     HISTORICAL_TRIAL_EVENTS_INDEX_SQL,
     HISTORICAL_TRIAL_EVENTS_TABLE_SQL,
+    SPONSOR_MAPPING_REVIEWS_INDEX_SQL,
+    SPONSOR_MAPPING_REVIEWS_TABLE_SQL,
     TRIAL_ANALYSES_INDEX_SQL,
     TRIAL_ANALYSES_TABLE_SQL,
 )
@@ -465,6 +467,17 @@ class HistoricalTrialEventRepository:
             for row in rows
         ]
 
+
+class SponsorMappingReviewRepository:
+    def __init__(self, connection: Any) -> None:
+        self.connection = connection
+
+    def create_tables(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(SPONSOR_MAPPING_REVIEWS_TABLE_SQL)
+            for statement in SPONSOR_MAPPING_REVIEWS_INDEX_SQL:
+                cursor.execute(statement)
+
     def get_quality_summary(self) -> dict[str, Any]:
         sql = """
         select
@@ -656,6 +669,8 @@ def initialize_database() -> None:
         trial_repository = ClinicalTrialsRepository(connection)
         analysis_repository = TrialAnalysisRepository(connection)
         historical_repository = HistoricalTrialEventRepository(connection)
+        sponsor_mapping_review_repository = SponsorMappingReviewRepository(connection)
         trial_repository.create_tables()
         analysis_repository.create_tables()
         historical_repository.create_tables()
+        sponsor_mapping_review_repository.create_tables()
