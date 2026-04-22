@@ -1,0 +1,1 @@
+"""Future label generation service."""
