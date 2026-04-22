@@ -49,6 +49,10 @@ HISTORICAL_EVENT_JSON_FIELDS = {
     "feature_payload",
 }
 
+SPONSOR_MAPPING_REVIEW_JSON_FIELDS = {
+    "alternatives",
+}
+
 COLUMN_SOURCE_MAP = {
     "trial_references": "references",
 }
@@ -391,6 +395,26 @@ HISTORICAL_EVENT_COLUMNS = [
     "feature_payload",
 ]
 
+SPONSOR_MAPPING_REVIEW_COLUMNS = [
+    "sponsor_name",
+    "normalized_sponsor_name",
+    "source_nct_id",
+    "suggested_company_name",
+    "suggested_ticker",
+    "suggested_cik",
+    "suggested_confidence",
+    "suggested_match_type",
+    "alternatives",
+    "review_status",
+    "reviewed_company_name",
+    "reviewed_ticker",
+    "reviewed_cik",
+    "reviewer_name",
+    "reviewer_email",
+    "review_notes",
+    "reviewed_at",
+]
+
 
 class HistoricalTrialEventRepository:
     def __init__(self, connection: Any) -> None:
@@ -466,17 +490,6 @@ class HistoricalTrialEventRepository:
             }
             for row in rows
         ]
-
-
-class SponsorMappingReviewRepository:
-    def __init__(self, connection: Any) -> None:
-        self.connection = connection
-
-    def create_tables(self) -> None:
-        with self.connection.cursor() as cursor:
-            cursor.execute(SPONSOR_MAPPING_REVIEWS_TABLE_SQL)
-            for statement in SPONSOR_MAPPING_REVIEWS_INDEX_SQL:
-                cursor.execute(statement)
 
     def get_quality_summary(self) -> dict[str, Any]:
         sql = """
@@ -662,6 +675,171 @@ class SponsorMappingReviewRepository:
             }
             for row in rows
         ]
+
+
+class SponsorMappingReviewRepository:
+    def __init__(self, connection: Any) -> None:
+        self.connection = connection
+
+    def create_tables(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(SPONSOR_MAPPING_REVIEWS_TABLE_SQL)
+            for statement in SPONSOR_MAPPING_REVIEWS_INDEX_SQL:
+                cursor.execute(statement)
+
+    def _serialize_review_value(self, column: str, value: Any) -> Any:
+        if column in SPONSOR_MAPPING_REVIEW_JSON_FIELDS:
+            return json.dumps(value if value is not None else [])
+        return value
+
+    def _deserialize_review_row(self, row: tuple[Any, ...]) -> dict[str, Any]:
+        return {
+            "review_id": row[0],
+            "sponsor_name": row[1],
+            "normalized_sponsor_name": row[2],
+            "source_nct_id": row[3],
+            "suggested_company_name": row[4],
+            "suggested_ticker": row[5],
+            "suggested_cik": row[6],
+            "suggested_confidence": row[7],
+            "suggested_match_type": row[8],
+            "alternatives": [] if row[9] is None else row[9],
+            "review_status": row[10],
+            "reviewed_company_name": row[11],
+            "reviewed_ticker": row[12],
+            "reviewed_cik": row[13],
+            "reviewer_name": row[14],
+            "reviewer_email": row[15],
+            "review_notes": row[16],
+            "reviewed_at": None if row[17] is None else str(row[17]),
+            "created_at": None if row[18] is None else str(row[18]),
+            "updated_at": None if row[19] is None else str(row[19]),
+        }
+
+    def upsert_review(self, review_record: dict[str, Any]) -> int:
+        normalized_sponsor_name = (review_record.get("normalized_sponsor_name") or "").strip()
+        sponsor_name = (review_record.get("sponsor_name") or "").strip()
+        if not sponsor_name:
+            raise ValueError("sponsor_name is required for sponsor mapping reviews.")
+        if not normalized_sponsor_name:
+            raise ValueError("normalized_sponsor_name is required for sponsor mapping reviews.")
+
+        placeholders = ", ".join(["%s"] * len(SPONSOR_MAPPING_REVIEW_COLUMNS))
+        insert_columns = ", ".join(SPONSOR_MAPPING_REVIEW_COLUMNS)
+        update_assignments = ", ".join(
+            f"{column} = excluded.{column}"
+            for column in SPONSOR_MAPPING_REVIEW_COLUMNS
+            if column != "normalized_sponsor_name"
+        )
+        values = [
+            self._serialize_review_value(column, review_record.get(column))
+            for column in SPONSOR_MAPPING_REVIEW_COLUMNS
+        ]
+
+        sql = f"""
+        insert into sponsor_mapping_reviews ({insert_columns})
+        values ({placeholders})
+        on conflict (normalized_sponsor_name) do update
+        set {update_assignments},
+            updated_at = now()
+        returning review_id;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, values)
+            row = cursor.fetchone()
+        return int(row[0])
+
+    def get_review_by_normalized_name(self, normalized_sponsor_name: str) -> dict[str, Any] | None:
+        sql = """
+        select
+            review_id,
+            sponsor_name,
+            normalized_sponsor_name,
+            source_nct_id,
+            suggested_company_name,
+            suggested_ticker,
+            suggested_cik,
+            suggested_confidence,
+            suggested_match_type,
+            alternatives,
+            review_status,
+            reviewed_company_name,
+            reviewed_ticker,
+            reviewed_cik,
+            reviewer_name,
+            reviewer_email,
+            review_notes,
+            reviewed_at,
+            created_at,
+            updated_at
+        from sponsor_mapping_reviews
+        where normalized_sponsor_name = %s;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (normalized_sponsor_name.strip(),))
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._deserialize_review_row(row)
+
+    def list_reviews(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        review_status: str | None = None,
+        suggested_ticker: str | None = None,
+        reviewer_email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses = []
+        params: list[Any] = []
+
+        if review_status:
+            clauses.append("review_status = %s")
+            params.append(review_status)
+        if suggested_ticker:
+            clauses.append("suggested_ticker = %s")
+            params.append(suggested_ticker.strip().upper())
+        if reviewer_email:
+            clauses.append("reviewer_email = %s")
+            params.append(reviewer_email.strip())
+
+        where_clause = ""
+        if clauses:
+            where_clause = "where " + " and ".join(clauses)
+
+        sql = f"""
+        select
+            review_id,
+            sponsor_name,
+            normalized_sponsor_name,
+            source_nct_id,
+            suggested_company_name,
+            suggested_ticker,
+            suggested_cik,
+            suggested_confidence,
+            suggested_match_type,
+            alternatives,
+            review_status,
+            reviewed_company_name,
+            reviewed_ticker,
+            reviewed_cik,
+            reviewer_name,
+            reviewer_email,
+            review_notes,
+            reviewed_at,
+            created_at,
+            updated_at
+        from sponsor_mapping_reviews
+        {where_clause}
+        order by updated_at desc, review_id desc
+        limit %s
+        offset %s;
+        """
+        params.extend([max(1, limit), max(0, offset)])
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+        return [self._deserialize_review_row(row) for row in rows]
 
 
 def initialize_database() -> None:
