@@ -14,6 +14,10 @@ python run.py describe-methodology --format markdown
 
 ## End Goal
 
+**Official north star**
+
+BTQ is a research-grade system for quantifying biological uncertainty in public biotech markets by building an auditable historical trial-event dataset and comparing modeled event risk to observed market behavior.
+
 BTQ is designed to become a research-grade biotech event intelligence system. Its purpose is to transform clinical trial metadata, sponsor identity resolution, regulatory context, and market reaction data into a structured historical dataset that can support:
 
 - catalyst research
@@ -23,6 +27,10 @@ BTQ is designed to become a research-grade biotech event intelligence system. It
 - a final probability, event-risk, and expected-reaction comparison layer
 
 The project is intentionally staged. Today it is strongest as a data and methodology platform. Over time it is intended to become a stronger research engine for analyzing whether biotech trial events produce repeatable market patterns.
+
+**Final product definition**
+
+BTQ should become a research-grade biotech event intelligence platform that constructs an auditable historical dataset of clinical trial catalysts, links those events to public-market entities, measures biological and data uncertainty, models trial success probability and event risk, and compares that modeled view to observed market behavior.
 
 ## Final Output Framework
 

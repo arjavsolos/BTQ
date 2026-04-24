@@ -106,3 +106,17 @@ In other words, the end of the architecture should answer:
 - what does the historical and modeled evidence suggest?
 - how uncertain is that estimate?
 - how does that compare with what the market appears to be pricing?
+
+## Official Build Target
+
+The architecture is now explicitly aimed at the final product defined in:
+
+- `docs/final_product_definition.md`
+
+That means future modules should be judged by whether they improve one of these end-state capabilities:
+
+- trustworthiness of the historical event dataset
+- explicit measurement of biological or data uncertainty
+- rigor of modeled probability and event-risk outputs
+- quality of the expected-reaction benchmark layer
+- clarity of the final market-comparison report

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-METHODOLOGY_VERSION = "1.1"
+METHODOLOGY_VERSION = "1.2"
 
 
 def build_methodology_snapshot() -> dict[str, Any]:
@@ -11,11 +11,24 @@ def build_methodology_snapshot() -> dict[str, Any]:
         "project_identity": {
             "name": "BTQ",
             "category": "biotech event intelligence and historical dataset engineering",
+            "north_star": (
+                "BTQ is a research-grade system for quantifying biological uncertainty "
+                "in public biotech markets by building an auditable historical "
+                "trial-event dataset and comparing modeled event risk to observed "
+                "market behavior."
+            ),
             "end_goal": (
                 "Build a research-grade pipeline that converts clinical trial, sponsor, "
                 "regulatory, and market data into analyzable event records for biotech "
                 "catalyst research, dataset QA, and a final probability, event-risk, "
                 "and expected-reaction comparison layer."
+            ),
+            "final_product_definition": (
+                "BTQ should become a research-grade biotech event intelligence platform "
+                "that constructs an auditable historical dataset of clinical trial "
+                "catalysts, links those events to public-market entities, measures "
+                "biological and data uncertainty, models trial success probability and "
+                "event risk, and compares that modeled view to observed market behavior."
             ),
             "primary_users": [
                 "quant researchers",
@@ -23,6 +36,25 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "healthcare data scientists",
                 "students building event-driven financial research systems",
             ],
+            "positioning_summaries": {
+                "readme": (
+                    "BTQ is a biotech event intelligence platform that turns public "
+                    "clinical-trial, regulatory, and market data into an auditable "
+                    "historical catalyst dataset for probability, event-risk, and "
+                    "expected-reaction analysis."
+                ),
+                "recruiter": (
+                    "BTQ demonstrates full-stack data engineering, entity resolution, "
+                    "workflow automation, event-study design, and uncertainty-aware "
+                    "research modeling in a difficult biotech finance setting."
+                ),
+                "paper_abstract": (
+                    "We present BTQ, a research pipeline for constructing and auditing a "
+                    "historical dataset of clinical trial catalysts linked to public "
+                    "biotech equities, with the goal of comparing modeled biological "
+                    "uncertainty and expected market reaction to observed market behavior."
+                ),
+            },
         },
         "system_scope": {
             "current_capabilities": [
@@ -287,10 +319,23 @@ def render_methodology_markdown() -> str:
         "",
         f"**Methodology version:** `{snapshot['methodology_version']}`",
         "",
+        f"**North star:** {project['north_star']}",
+        "",
         f"**End goal:** {project['end_goal']}",
+        "",
+        f"**Final product definition:** {project['final_product_definition']}",
         "",
         "**Primary users**",
         bullet_list(project["primary_users"]),
+        "",
+        "**Positioning summaries**",
+        bullet_list(
+            [
+                f"README: {project['positioning_summaries']['readme']}",
+                f"Recruiter: {project['positioning_summaries']['recruiter']}",
+                f"Paper abstract: {project['positioning_summaries']['paper_abstract']}",
+            ]
+        ),
         "",
         "## System Scope",
         "",

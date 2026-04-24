@@ -11,6 +11,9 @@ class MethodologyTestCase(unittest.TestCase):
 
         self.assertEqual(snapshot["methodology_version"], METHODOLOGY_VERSION)
         self.assertIn("project_identity", snapshot)
+        self.assertIn("north_star", snapshot["project_identity"])
+        self.assertIn("final_product_definition", snapshot["project_identity"])
+        self.assertIn("positioning_summaries", snapshot["project_identity"])
         self.assertIn("dataset_methodology", snapshot)
         self.assertIn("final_output_framework", snapshot)
         self.assertIn("event_date_methodology", snapshot)
@@ -22,6 +25,8 @@ class MethodologyTestCase(unittest.TestCase):
         markdown = render_methodology_markdown()
 
         self.assertIn("# Methodology", markdown)
+        self.assertIn("**North star:**", markdown)
+        self.assertIn("**Final product definition:**", markdown)
         self.assertIn("## Final Output Framework", markdown)
         self.assertIn("## Event-Date Methodology", markdown)
         self.assertIn("## Sponsor Mapping Methodology", markdown)
