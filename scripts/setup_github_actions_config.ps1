@@ -101,6 +101,11 @@ function Set-GitHubVariable {
         [string]$Value
     )
 
+    if ($null -eq $Value -or $Value -eq "") {
+        Write-Host "Skipping GitHub variable $Name because its value is blank"
+        return
+    }
+
     Write-Host "Setting GitHub variable $Name=$Value"
     Invoke-Gh @("variable", "set", $Name, "--repo", $RepoSlug, "--body", $Value) | Out-Null
 }
