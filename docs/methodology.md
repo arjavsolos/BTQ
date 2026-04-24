@@ -161,6 +161,7 @@ Every chosen event-date proxy is stored with:
 - `event_date_candidate`
 - `event_date_source`
 - `event_date_precision`
+- `event_date_confidence`
 
 This is one of the most important methodological safeguards in the entire project because it prevents hidden assumptions about catalyst timing.
 

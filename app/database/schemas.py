@@ -59,6 +59,7 @@ create table if not exists clinical_trials (
   event_date_candidate text,
   event_date_source text,
   event_date_precision text,
+  event_date_confidence text,
   locations jsonb,
   location_count integer,
   country_counts jsonb,

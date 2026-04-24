@@ -118,6 +118,7 @@ TRIAL_COLUMNS = [
     "event_date_candidate",
     "event_date_source",
     "event_date_precision",
+    "event_date_confidence",
     "locations",
     "location_count",
     "country_counts",

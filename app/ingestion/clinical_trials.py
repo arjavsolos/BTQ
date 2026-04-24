@@ -169,6 +169,30 @@ class ClinicalTrialsIngestor:
             return "year"
         return "unknown"
 
+    def _score_event_date_confidence(
+        self,
+        event_date_value: str | None,
+        event_date_source: str | None,
+    ) -> str:
+        precision = self._infer_date_precision(event_date_value)
+        if not event_date_value or not event_date_source or precision is None:
+            return "unknown"
+
+        if precision == "day":
+            if event_date_source in {"primary_completion_date", "completion_date"}:
+                return "high"
+            if event_date_source == "results_first_posted":
+                return "moderate"
+            if event_date_source == "last_update_posted":
+                return "low"
+        if precision == "month":
+            if event_date_source in {"primary_completion_date", "completion_date"}:
+                return "moderate"
+            return "low"
+        if precision == "year":
+            return "low"
+        return "unknown"
+
     def _choose_event_date(
         self,
         status_module: dict[str, Any],
@@ -428,6 +452,10 @@ class ClinicalTrialsIngestor:
             "event_date_candidate": event_date_candidate,
             "event_date_source": event_date_source,
             "event_date_precision": self._infer_date_precision(event_date_candidate),
+            "event_date_confidence": self._score_event_date_confidence(
+                event_date_candidate,
+                event_date_source,
+            ),
             "locations": location_rows,
             "location_count": len(location_rows),
             "country_counts": country_counts,

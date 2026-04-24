@@ -76,6 +76,7 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertEqual(record["phase_score"], 3)
         self.assertEqual(record["event_date_candidate"], "2025-01-15")
         self.assertEqual(record["event_date_source"], "primary_completion_date")
+        self.assertEqual(record["event_date_confidence"], "high")
         self.assertTrue(record["has_primary_outcomes"])
         self.assertTrue(record["has_locations"])
         self.assertTrue(record["has_results"])
@@ -100,6 +101,24 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertEqual(record["event_date_candidate"], "2025-02-10")
         self.assertEqual(record["event_date_source"], "results_first_posted")
         self.assertEqual(record["event_date_precision"], "day")
+        self.assertEqual(record["event_date_confidence"], "moderate")
+
+    def test_extract_trial_record_scores_low_confidence_for_fallback_event_date(self) -> None:
+        ingestor = ClinicalTrialsIngestor()
+        study = {
+            "protocolSection": {
+                "identificationModule": {"nctId": "NCT00000003"},
+                "statusModule": {
+                    "lastUpdatePostDateStruct": {"date": "2025-03-01"},
+                },
+            }
+        }
+
+        record = ingestor.extract_trial_record(study)
+
+        self.assertEqual(record["event_date_candidate"], "2025-03-01")
+        self.assertEqual(record["event_date_source"], "last_update_posted")
+        self.assertEqual(record["event_date_confidence"], "low")
 
 
 if __name__ == "__main__":

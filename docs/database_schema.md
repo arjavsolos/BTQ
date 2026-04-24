@@ -101,6 +101,9 @@ The `clinical_trials` table is the canonical storage layer for normalized trial 
 - `results_first_posted` `TEXT`
 - `last_update_posted` `TEXT`
 - `event_date_candidate` `TEXT`
+- `event_date_source` `TEXT`
+- `event_date_precision` `TEXT`
+- `event_date_confidence` `TEXT`
 
 ### Site and geography data
 
@@ -192,6 +195,7 @@ Core fields:
 - `nct_id` is canonical and should be unique.
 - `requested_nct_id` may differ from `nct_id` because alias IDs can resolve to the same study.
 - Date fields are currently stored as strings because ClinicalTrials.gov sometimes returns partial dates like `2008-10`.
+- `event_date_confidence` captures the current heuristic confidence level of the chosen catalyst-date proxy.
 - Nested arrays and source-rich objects should remain JSONB until there is a proven need to normalize them further.
 
 ## Minimal SQL Shape
