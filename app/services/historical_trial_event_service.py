@@ -135,6 +135,7 @@ class HistoricalTrialEventService:
             "event_date_candidate": trial.get("event_date_candidate"),
             "event_date_source": trial.get("event_date_source"),
             "event_date_precision": trial.get("event_date_precision"),
+            "event_date_confidence": trial.get("event_date_confidence"),
             "mapped_ticker": sponsor_mapping.get("ticker"),
             "mapped_cik": sponsor_mapping.get("cik"),
             "matched_company_name": sponsor_mapping.get("matched_company_name"),

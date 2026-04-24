@@ -93,6 +93,7 @@ One row combines:
 - a chosen `event_date_candidate`
 - an `event_date_source`
 - an event-date precision label
+- an event-date confidence label
 - a sponsor-to-ticker mapping result
 - sponsor-linked OpenFDA approval context
 - a market event window around the selected date

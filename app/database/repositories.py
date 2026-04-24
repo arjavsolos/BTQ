@@ -7,6 +7,7 @@ from app.database.schemas import (
     CLINICAL_TRIALS_MIGRATION_SQL,
     CLINICAL_TRIALS_TABLE_SQL,
     HISTORICAL_TRIAL_EVENTS_INDEX_SQL,
+    HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL,
     HISTORICAL_TRIAL_EVENTS_TABLE_SQL,
     SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL,
     SPONSOR_MAPPING_REVIEWS_INDEX_SQL,
@@ -375,6 +376,7 @@ HISTORICAL_EVENT_COLUMNS = [
     "event_date_candidate",
     "event_date_source",
     "event_date_precision",
+    "event_date_confidence",
     "mapped_ticker",
     "mapped_cik",
     "matched_company_name",
@@ -429,6 +431,8 @@ class HistoricalTrialEventRepository:
     def create_tables(self) -> None:
         with self.connection.cursor() as cursor:
             cursor.execute(HISTORICAL_TRIAL_EVENTS_TABLE_SQL)
+            for statement in HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL:
+                cursor.execute(statement)
             for statement in HISTORICAL_TRIAL_EVENTS_INDEX_SQL:
                 cursor.execute(statement)
 
@@ -608,6 +612,26 @@ class HistoricalTrialEventRepository:
         return [
             {
                 "event_date_precision": row[0],
+                "event_count": row[1],
+            }
+            for row in rows
+        ]
+
+    def get_event_date_confidence_breakdown(self) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(nullif(event_date_confidence, ''), 'UNKNOWN') as event_date_confidence,
+            count(*) as event_count
+        from historical_trial_events
+        group by 1
+        order by event_count desc, event_date_confidence asc;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        return [
+            {
+                "event_date_confidence": row[0],
                 "event_count": row[1],
             }
             for row in rows

@@ -104,6 +104,8 @@ The `clinical_trials` table is the canonical storage layer for normalized trial 
 - `event_date_source` `TEXT`
 - `event_date_precision` `TEXT`
 - `event_date_confidence` `TEXT`
+- `event_date_precision` `TEXT`
+- `event_date_confidence` `TEXT`
 
 ### Site and geography data
 
@@ -184,6 +186,7 @@ Core fields:
 - `ticker`
 - `event_date`
 - `event_date_source`
+- `event_date_confidence`
 - `pre_event_close`
 - `event_close`
 - `post_1d_return`

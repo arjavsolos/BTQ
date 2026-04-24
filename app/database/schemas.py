@@ -159,6 +159,7 @@ create table if not exists historical_trial_events (
   event_date_candidate text,
   event_date_source text,
   event_date_precision text,
+  event_date_confidence text,
   mapped_ticker text,
   mapped_cik text,
   matched_company_name text,
@@ -197,10 +198,19 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
         "on historical_trial_events (event_date_candidate);"
     ),
     (
+        "create index if not exists historical_trial_events_event_date_confidence_idx "
+        "on historical_trial_events (event_date_confidence);"
+    ),
+    (
         "create index if not exists historical_trial_events_model_ready_idx "
         "on historical_trial_events (is_model_ready);"
     ),
     "create index if not exists historical_trial_events_created_at_idx on historical_trial_events (created_at desc);",
+]
+
+
+HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL = [
+    "alter table historical_trial_events add column if not exists event_date_confidence text;",
 ]
 
 

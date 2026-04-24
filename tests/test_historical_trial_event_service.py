@@ -28,6 +28,7 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
                 "event_date_candidate": "2025-01-15",
                 "event_date_source": "primary_completion_date",
                 "event_date_precision": "day",
+                "event_date_confidence": "high",
                 "intervention_types": ["DRUG"],
                 "conditions": ["Lung Cancer"],
                 "condition_keywords": ["oncology"],
@@ -70,6 +71,7 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
         self.assertEqual(record["analysis_id"], 17)
         self.assertEqual(record["nct_id"], "NCT00000001")
         self.assertEqual(record["mapped_ticker"], "PFE")
+        self.assertEqual(record["event_date_confidence"], "high")
         self.assertEqual(record["approval_record_count"], 1)
         self.assertEqual(record["approval_application_numbers"], ["NDA000001"])
         self.assertTrue(record["is_model_ready"])
@@ -84,6 +86,7 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
                 "nct_id": "NCT00000002",
                 "event_date_candidate": "2025-01",
                 "event_date_precision": "month",
+                "event_date_confidence": "low",
             },
             "sponsor_mapping": {
                 "ticker": None,

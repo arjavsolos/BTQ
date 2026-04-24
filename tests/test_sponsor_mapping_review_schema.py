@@ -4,6 +4,7 @@ import unittest
 
 from app.database.repositories import SponsorMappingReviewRepository
 from app.database.schemas import (
+    SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL,
     SPONSOR_MAPPING_REVIEWS_INDEX_SQL,
     SPONSOR_MAPPING_REVIEWS_TABLE_SQL,
 )
@@ -56,7 +57,8 @@ class SponsorMappingReviewRepositoryTests(unittest.TestCase):
         self.assertEqual(connection.executed[0][0], SPONSOR_MAPPING_REVIEWS_TABLE_SQL.strip())
         self.assertEqual(
             [statement for statement, _ in connection.executed[1:]],
-            [statement.strip() for statement in SPONSOR_MAPPING_REVIEWS_INDEX_SQL],
+            [statement.strip() for statement in SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL]
+            + [statement.strip() for statement in SPONSOR_MAPPING_REVIEWS_INDEX_SQL],
         )
 
     def test_upsert_review_serializes_alternatives_and_returns_review_id(self) -> None:

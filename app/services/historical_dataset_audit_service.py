@@ -91,6 +91,7 @@ class HistoricalDatasetAuditService:
                     "event_count",
                 ),
                 "event_date_precision": repository.get_event_date_precision_breakdown(),
+                "event_date_confidence": repository.get_event_date_confidence_breakdown(),
             },
             "warning_frequency": repository.get_warning_frequency(limit=top_warning_limit),
             "recent_issues": repository.get_recent_issues(limit=issue_limit),
