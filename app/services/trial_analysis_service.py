@@ -26,6 +26,7 @@ from app.ingestion import (
     SecCompanyMapper,
 )
 from app.services.historical_trial_event_service import HistoricalTrialEventService
+from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
 
 DAY_PRECISION_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -43,12 +44,16 @@ class TrialAnalysisService:
         sec_mapper: SecCompanyMapper | None = None,
         openfda_ingestor: OpenFDAIngestor | None = None,
         market_data_ingestor: MarketDataIngestor | None = None,
+        sponsor_mapping_review_service: SponsorMappingReviewService | None = None,
         persist_trial_records: bool = True,
     ) -> None:
         self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
         self.sec_mapper = sec_mapper or SecCompanyMapper()
         self.openfda_ingestor = openfda_ingestor or OpenFDAIngestor()
         self.market_data_ingestor = market_data_ingestor or MarketDataIngestor()
+        self.sponsor_mapping_review_service = sponsor_mapping_review_service or SponsorMappingReviewService(
+            sec_mapper=self.sec_mapper
+        )
         self.persist_trial_records = persist_trial_records
         self.historical_event_service = HistoricalTrialEventService()
 
@@ -97,10 +102,17 @@ class TrialAnalysisService:
         try:
             result = self.sec_mapper.match_sponsor_to_ticker(sponsor_name)
             mapping = asdict(result)
+            resolution = self.sponsor_mapping_review_service.apply_review_override(
+                sponsor_name=sponsor_name,
+                match_result=mapping,
+            )
+            mapping = resolution.get("mapping")
             if not mapping.get("ticker"):
                 warnings.append("Sponsor mapping did not produce a confident public ticker match.")
             elif (mapping.get("confidence") or 0) < 0.85:
                 warnings.append("Sponsor mapping produced a low-confidence ticker match that may need review.")
+            if resolution.get("override_applied"):
+                warnings.append("Sponsor mapping used a reviewed override instead of the raw SEC match.")
             return mapping, warnings
         except Exception as exc:
             warnings.append(f"SEC sponsor mapping failed: {exc}")

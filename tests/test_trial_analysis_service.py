@@ -59,6 +59,29 @@ class _MarketStub:
         }
 
 
+class _SponsorReviewStub:
+    def __init__(self, override_ticker: str | None = None) -> None:
+        self.override_ticker = override_ticker
+
+    def apply_review_override(self, sponsor_name: str | None, match_result: dict | None) -> dict:
+        if not self.override_ticker or not match_result:
+            return {
+                "mapping": match_result,
+                "review_record": None,
+                "override_applied": False,
+            }
+
+        overridden_mapping = dict(match_result)
+        overridden_mapping["ticker"] = self.override_ticker
+        overridden_mapping["mapping_source"] = "sponsor_mapping_review"
+        overridden_mapping["reviewed_mapping_status"] = "approved_override"
+        return {
+            "mapping": overridden_mapping,
+            "review_record": {"review_status": "approved"},
+            "override_applied": True,
+        }
+
+
 class TrialAnalysisServiceTests(unittest.TestCase):
     def test_analyze_trial_returns_joined_output(self) -> None:
         service = TrialAnalysisService(
@@ -66,6 +89,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             sec_mapper=_SecStub(),
             openfda_ingestor=_OpenFDAStub(),
             market_data_ingestor=_MarketStub(),
+            sponsor_mapping_review_service=_SponsorReviewStub(),
         )
 
         result = service.analyze_trial("NCT00000001")
@@ -75,6 +99,25 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["fda_context"]["approval_record_count"], 1)
         self.assertEqual(result["market_data"]["event_day_return"], 0.123)
         self.assertEqual(result["warnings"], [])
+
+    def test_analyze_trial_uses_approved_mapping_override_when_available(self) -> None:
+        service = TrialAnalysisService(
+            clinical_trials_ingestor=_ClinicalStub(),
+            sec_mapper=_SecStub(),
+            openfda_ingestor=_OpenFDAStub(),
+            market_data_ingestor=_MarketStub(),
+            sponsor_mapping_review_service=_SponsorReviewStub(override_ticker="MRK"),
+        )
+
+        result = service.analyze_trial("NCT00000001")
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["summary"]["mapped_ticker"], "MRK")
+        self.assertEqual(result["market_data"]["ticker"], "MRK")
+        self.assertIn(
+            "Sponsor mapping used a reviewed override instead of the raw SEC match.",
+            result["warnings"],
+        )
 
 
 if __name__ == "__main__":

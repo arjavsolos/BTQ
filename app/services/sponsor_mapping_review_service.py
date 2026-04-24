@@ -44,12 +44,18 @@ class SponsorMappingReviewService:
         if clean_review_status == "rejected":
             return "rejected"
         if clean_review_status == "approved":
-            if clean_reviewed_ticker and clean_suggested_ticker and clean_reviewed_ticker != clean_suggested_ticker:
+            if (
+                clean_reviewed_ticker
+                and clean_suggested_ticker
+                and clean_reviewed_ticker != clean_suggested_ticker
+            ):
                 return "approved_override"
             return "approved_suggested"
         return "unreviewed"
 
-    def _coerce_match_payload(self, match_result: SponsorMatchResult | dict[str, Any] | None) -> dict[str, Any]:
+    def _coerce_match_payload(
+        self, match_result: SponsorMatchResult | dict[str, Any] | None
+    ) -> dict[str, Any]:
         if match_result is None:
             return {}
         if isinstance(match_result, dict):
@@ -69,6 +75,38 @@ class SponsorMappingReviewService:
         if confidence < self.review_confidence_threshold:
             return True
         return match_type in {"no_match", "fuzzy"}
+
+    def _build_effective_mapping_from_review(
+        self, review_record: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        if review_record is None:
+            return None
+        if (review_record.get("review_status") or "").strip().lower() != "approved":
+            return None
+
+        company_name = review_record.get("reviewed_company_name") or review_record.get("suggested_company_name")
+        ticker = (
+            (review_record.get("reviewed_ticker") or review_record.get("suggested_ticker") or "")
+            .strip()
+            .upper()
+        )
+        cik = review_record.get("reviewed_cik") or review_record.get("suggested_cik")
+        if not ticker:
+            return None
+
+        reviewed_mapping_status = (review_record.get("reviewed_mapping_status") or "").strip().lower() or None
+        return {
+            "sponsor_name": review_record.get("sponsor_name"),
+            "matched_company_name": company_name,
+            "ticker": ticker,
+            "cik": cik,
+            "confidence": review_record.get("suggested_confidence"),
+            "match_type": f"reviewed_{reviewed_mapping_status or 'approved'}",
+            "alternatives": review_record.get("alternatives") or [],
+            "mapping_source": "sponsor_mapping_review",
+            "review_status": review_record.get("review_status"),
+            "reviewed_mapping_status": reviewed_mapping_status,
+        }
 
     def build_review_record(
         self,
@@ -128,6 +166,121 @@ class SponsorMappingReviewService:
             "reviewer_email": reviewer_email,
             "review_notes": review_notes,
             "reviewed_at": reviewed_at,
+        }
+
+    def submit_review_decision(
+        self,
+        sponsor_name: str,
+        review_status: str,
+        match_result: SponsorMatchResult | dict[str, Any] | None = None,
+        source_nct_id: str | None = None,
+        reviewed_company_name: str | None = None,
+        reviewed_ticker: str | None = None,
+        reviewed_cik: str | None = None,
+        reviewed_mapping_status: str | None = None,
+        reviewer_name: str | None = None,
+        reviewer_email: str | None = None,
+        review_notes: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_sponsor_name = self.normalize_sponsor_name(sponsor_name)
+        existing_review: dict[str, Any] | None = None
+        with get_connection() as connection:
+            repository = SponsorMappingReviewRepository(connection)
+            repository.create_tables()
+            if normalized_sponsor_name:
+                existing_review = repository.get_review_by_normalized_name(normalized_sponsor_name)
+
+            match_payload = self._coerce_match_payload(match_result)
+            if not match_payload and existing_review is not None:
+                match_payload = {
+                    "matched_company_name": existing_review.get("suggested_company_name"),
+                    "ticker": existing_review.get("suggested_ticker"),
+                    "cik": existing_review.get("suggested_cik"),
+                    "confidence": existing_review.get("suggested_confidence"),
+                    "match_type": existing_review.get("suggested_match_type"),
+                    "alternatives": existing_review.get("alternatives") or [],
+                }
+
+            clean_review_status = (review_status or "pending").strip().lower()
+            resolved_reviewed_company_name = reviewed_company_name
+            resolved_reviewed_ticker = reviewed_ticker
+            resolved_reviewed_cik = reviewed_cik
+
+            if clean_review_status == "approved":
+                if not resolved_reviewed_company_name:
+                    resolved_reviewed_company_name = (
+                        existing_review.get("suggested_company_name")
+                        if existing_review is not None
+                        else match_payload.get("matched_company_name")
+                    )
+                if not resolved_reviewed_ticker:
+                    resolved_reviewed_ticker = (
+                        existing_review.get("suggested_ticker")
+                        if existing_review is not None
+                        else match_payload.get("ticker")
+                    )
+                if not resolved_reviewed_cik:
+                    resolved_reviewed_cik = (
+                        existing_review.get("suggested_cik")
+                        if existing_review is not None
+                        else match_payload.get("cik")
+                    )
+
+            review_record = self.build_review_record(
+                sponsor_name=sponsor_name,
+                match_result=match_payload,
+                source_nct_id=source_nct_id
+                or (None if existing_review is None else existing_review.get("source_nct_id")),
+                review_status=clean_review_status,
+                reviewed_mapping_status=reviewed_mapping_status,
+                reviewer_name=reviewer_name,
+                reviewer_email=reviewer_email,
+                review_notes=review_notes,
+                reviewed_company_name=resolved_reviewed_company_name,
+                reviewed_ticker=resolved_reviewed_ticker,
+                reviewed_cik=resolved_reviewed_cik,
+            )
+            review_id = repository.upsert_review(review_record)
+            saved_review = repository.get_review_by_normalized_name(review_record["normalized_sponsor_name"])
+
+        return {
+            "review_id": review_id,
+            "review_record": saved_review if saved_review is not None else review_record,
+        }
+
+    def apply_review_override(
+        self,
+        sponsor_name: str | None,
+        match_result: SponsorMatchResult | dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        payload = self._coerce_match_payload(match_result)
+        normalized_sponsor_name = self.normalize_sponsor_name(sponsor_name)
+        if not normalized_sponsor_name:
+            return {
+                "mapping": None if not payload else payload,
+                "review_record": None,
+                "override_applied": False,
+            }
+
+        with get_connection() as connection:
+            repository = SponsorMappingReviewRepository(connection)
+            repository.create_tables()
+            review_record = repository.get_review_by_normalized_name(normalized_sponsor_name)
+
+        effective_mapping = self._build_effective_mapping_from_review(review_record)
+        if effective_mapping is None:
+            return {
+                "mapping": None if not payload else payload,
+                "review_record": review_record,
+                "override_applied": False,
+            }
+
+        raw_ticker = (payload.get("ticker") or "").strip().upper() or None
+        override_applied = effective_mapping.get("ticker") != raw_ticker
+        return {
+            "mapping": effective_mapping,
+            "review_record": review_record,
+            "override_applied": override_applied,
         }
 
     def queue_review(

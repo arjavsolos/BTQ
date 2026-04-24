@@ -187,6 +187,31 @@ Supported output formats currently include:
 - `json`
 - `jsonl`
 
+### Step 7. Approved reviews can become effective mapping overrides
+
+Once a review row has been marked as approved, BTQ can treat it as a reusable mapping decision instead of only as stored metadata.
+
+That matters because a human-reviewed mapping should be able to improve downstream analysis. Otherwise the system would know that the machine suggestion was wrong, but still continue to use the wrong ticker later.
+
+The sponsor-mapping review service now supports two operational behaviors:
+
+- saving a review decision as an approved or rejected final mapping
+- applying an approved reviewed mapping back onto future sponsor-resolution calls
+
+In practice, that means:
+
+- if the reviewer approves the original machine suggestion, BTQ can reuse that approved mapping
+- if the reviewer overrides the original machine suggestion, BTQ can reuse the override instead
+
+This gives the project a clean path from:
+
+- machine suggestion
+- to review queue
+- to reviewed final identity
+- to downstream analysis reuse
+
+That is an important step toward making sponsor mapping auditable and self-improving over time.
+
 ## What Data A Review Row Stores
 
 The `sponsor_mapping_reviews` table is designed to preserve both the machine suggestion and the human-reviewed outcome.
