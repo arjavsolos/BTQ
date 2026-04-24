@@ -4,8 +4,8 @@ import unittest
 
 from app.database.repositories import SponsorMappingReviewRepository
 from app.database.schemas import (
-    SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL,
     SPONSOR_MAPPING_REVIEWS_INDEX_SQL,
+    SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL,
     SPONSOR_MAPPING_REVIEWS_TABLE_SQL,
 )
 
