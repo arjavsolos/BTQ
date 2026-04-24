@@ -4,9 +4,11 @@ from typing import Any
 from app.database.connection import get_connection
 from app.database.schemas import (
     CLINICAL_TRIALS_INDEX_SQL,
+    CLINICAL_TRIALS_MIGRATION_SQL,
     CLINICAL_TRIALS_TABLE_SQL,
     HISTORICAL_TRIAL_EVENTS_INDEX_SQL,
     HISTORICAL_TRIAL_EVENTS_TABLE_SQL,
+    SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL,
     SPONSOR_MAPPING_REVIEWS_INDEX_SQL,
     SPONSOR_MAPPING_REVIEWS_TABLE_SQL,
     TRIAL_ANALYSES_INDEX_SQL,
@@ -172,6 +174,8 @@ class ClinicalTrialsRepository:
     def create_tables(self) -> None:
         with self.connection.cursor() as cursor:
             cursor.execute(CLINICAL_TRIALS_TABLE_SQL)
+            for statement in CLINICAL_TRIALS_MIGRATION_SQL:
+                cursor.execute(statement)
             for statement in CLINICAL_TRIALS_INDEX_SQL:
                 cursor.execute(statement)
 
@@ -686,6 +690,8 @@ class SponsorMappingReviewRepository:
     def create_tables(self) -> None:
         with self.connection.cursor() as cursor:
             cursor.execute(SPONSOR_MAPPING_REVIEWS_TABLE_SQL)
+            for statement in SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL:
+                cursor.execute(statement)
             for statement in SPONSOR_MAPPING_REVIEWS_INDEX_SQL:
                 cursor.execute(statement)
 

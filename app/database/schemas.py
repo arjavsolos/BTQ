@@ -101,6 +101,11 @@ CLINICAL_TRIALS_INDEX_SQL = [
 ]
 
 
+CLINICAL_TRIALS_MIGRATION_SQL = [
+    "alter table clinical_trials add column if not exists event_date_confidence text;",
+]
+
+
 TRIAL_ANALYSES_TABLE_SQL = """
 create table if not exists trial_analyses (
   analysis_id bigserial primary key,
@@ -251,5 +256,13 @@ SPONSOR_MAPPING_REVIEWS_INDEX_SQL = [
     (
         "create index if not exists sponsor_mapping_reviews_created_at_idx "
         "on sponsor_mapping_reviews (created_at desc);"
+    ),
+]
+
+
+SPONSOR_MAPPING_REVIEWS_MIGRATION_SQL = [
+    (
+        "alter table sponsor_mapping_reviews add column if not exists "
+        "reviewed_mapping_status text not null default 'unreviewed';"
     ),
 ]
