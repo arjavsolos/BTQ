@@ -17,6 +17,7 @@ if load_dotenv is not None:
 
 @dataclass(frozen=True, slots=True)
 class DatabaseSettings:
+    database_target: str
     database_url: str
     pool_enabled: bool
     pool_min_size: int
@@ -93,6 +94,10 @@ def _get_bool_env(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def get_database_target() -> str:
+    return (os.getenv("DATABASE_TARGET") or "default").strip().lower()
+
+
 def _build_database_url_from_parts() -> str | None:
     host = os.getenv("DB_HOST")
     port = os.getenv("DB_PORT", "5432")
@@ -111,19 +116,30 @@ def _build_database_url_from_parts() -> str | None:
     return url
 
 
+def _get_target_database_url(database_target: str) -> str | None:
+    if database_target in {"local", "localhost"}:
+        return os.getenv("LOCAL_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if database_target in {"neon", "hosted", "demo"}:
+        return os.getenv("NEON_DATABASE_URL") or os.getenv("HOSTED_DATABASE_URL") or os.getenv("DATABASE_URL")
+    return os.getenv("DATABASE_URL")
+
+
 def get_database_url() -> str:
-    database_url = os.getenv("DATABASE_URL")
+    database_target = get_database_target()
+    database_url = _get_target_database_url(database_target)
     if not database_url:
         database_url = _build_database_url_from_parts()
     if not database_url:
         raise DatabaseConfigError(
-            "Database config is missing. Set DATABASE_URL or the DB_HOST/DB_NAME/DB_USER/DB_PASSWORD variables."
+            "Database config is missing. Set DATABASE_URL, a target-specific URL such as "
+            "LOCAL_DATABASE_URL or NEON_DATABASE_URL, or the DB_HOST/DB_NAME/DB_USER/DB_PASSWORD variables."
         )
     return database_url
 
 
 def get_database_settings() -> DatabaseSettings:
     return DatabaseSettings(
+        database_target=get_database_target(),
         database_url=get_database_url(),
         pool_enabled=_get_bool_env("DATABASE_POOL_ENABLED", True),
         pool_min_size=int(os.getenv("DATABASE_POOL_MIN_SIZE", "1")),
@@ -234,6 +250,7 @@ def check_database_connection() -> dict[str, Any]:
     settings = get_database_settings()
     return {
         "status": "ok",
+        "database_target": settings.database_target,
         "database_name": database_name,
         "database_user": database_user,
         "checked_at": str(checked_at),
