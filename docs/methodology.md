@@ -20,8 +20,46 @@ BTQ is designed to become a research-grade biotech event intelligence system. It
 - historical event studies
 - dataset quality auditing
 - future predictive and probabilistic modeling
+- a final probability, event-risk, and expected-reaction comparison layer
 
 The project is intentionally staged. Today it is strongest as a data and methodology platform. Over time it is intended to become a stronger research engine for analyzing whether biotech trial events produce repeatable market patterns.
+
+## Final Output Framework
+
+The best end-state for BTQ is not an exact stock-price target.
+
+The stronger and more defensible goal is to produce a comparison between:
+
+- modeled biological success probability
+- modeled event risk and uncertainty
+- historically grounded expected market reaction
+- the observed or currently priced market setup
+
+That means the system should eventually answer questions like:
+
+- does the model imply a higher or lower success probability than the market appears to assume?
+- does this trial look unusually risky or unusually clean relative to historical analogs?
+- does the current market setup look rich, cheap, aligned, or indeterminate relative to the model view?
+
+The final output layer should therefore emphasize:
+
+- probability comparison
+- event-risk comparison
+- expected-reaction comparison
+
+and should explicitly avoid overselling the project as an exact point-price prediction engine.
+
+The ideal final output for one analyzed trial should look more like:
+
+- modeled success probability
+- confidence tier for that estimate
+- catalyst or event-risk score
+- historical analog-based expected event-day reaction range
+- historical post-window reaction context
+- market-view proxy or market-implied event-risk proxy
+- plain-language comparison summary
+
+This framing is stronger for research credibility because it fits the actual structure of biotech catalyst events, which are noisy, expectation-driven, and often discontinuous.
 
 ## Core Research Principle
 
@@ -206,6 +244,7 @@ To make stronger quant and biotech claims, the next research steps should be:
 - benchmark sponsor mapping against reviewed examples
 - evaluate event-date proxy quality against known announcement dates when possible
 - produce descriptive backtests across the stored event set
+- formalize the probability, event-risk, and expected-reaction comparison layer
 - separate exploratory findings from out-of-sample validation
 
 That sequence matters because strong claims without dataset validation would weaken the credibility of the whole project.
@@ -219,6 +258,7 @@ The project currently has several real limitations:
 - Free market data can miss detail that matters for event studies.
 - OpenFDA sponsor context is helpful but not a complete approval-history model.
 - Current outputs are best understood as research infrastructure, not live trading signals.
+- The final comparison layer should not be framed as an exact stock-price predictor without much stronger evidence and richer market data.
 
 These limitations do not make the project weak. They just define the boundary of what can be claimed honestly.
 

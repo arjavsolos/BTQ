@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-METHODOLOGY_VERSION = "1.0"
+METHODOLOGY_VERSION = "1.1"
 
 
 def build_methodology_snapshot() -> dict[str, Any]:
@@ -14,7 +14,8 @@ def build_methodology_snapshot() -> dict[str, Any]:
             "end_goal": (
                 "Build a research-grade pipeline that converts clinical trial, sponsor, "
                 "regulatory, and market data into analyzable event records for biotech "
-                "catalyst research, dataset QA, and later probabilistic modeling."
+                "catalyst research, dataset QA, and a final probability, event-risk, "
+                "and expected-reaction comparison layer."
             ),
             "primary_users": [
                 "quant researchers",
@@ -39,7 +40,54 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "event-date confidence scoring",
                 "predictive modeling and backtesting",
                 "probability-vs-market comparison once higher-fidelity options data is integrated",
+                "expected-reaction comparison against observed market setup",
             ],
+        },
+        "final_output_framework": {
+            "objective": (
+                "The final analytical layer should compare model-implied biological uncertainty "
+                "and event-risk signals against observed market behavior or market-implied event "
+                "pricing, rather than claiming an exact future stock price target."
+            ),
+            "core_outputs": [
+                "modeled trial success probability",
+                "uncertainty band or confidence tier for that probability estimate",
+                "event-risk classification based on trial, sponsor, and dataset quality signals",
+                "expected event-day and post-window reaction context derived from historical analogs",
+                "comparison between modeled view and observed market setup",
+                "research-facing explanation of what drives the comparison result",
+            ],
+            "comparison_layers": [
+                "probability comparison: modeled success probability versus market-implied or heuristic market view",
+                (
+                    "event-risk comparison: modeled catalyst risk and data quality "
+                    "versus observed uncertainty in the setup"
+                ),
+                (
+                    "expected-reaction comparison: historically grounded reaction "
+                    "range versus realized or currently priced behavior"
+                ),
+            ],
+            "non_goals": [
+                "do not frame the final system as an exact point-price predictor",
+                "do not claim a live tradable edge before formal backtests and out-of-sample validation",
+                "do not hide low-quality data rows behind overly confident final scores",
+            ],
+            "example_output_contract": {
+                "trial_identifier": "NCT example or canonical event row",
+                "modeled_success_probability": "0-1 probability estimate",
+                "probability_confidence_tier": "low, moderate, or high confidence in the estimate",
+                "event_risk_score": "composite catalyst-risk or uncertainty score",
+                "historical_expected_reaction": {
+                    "event_day_range": "historical analog-based reaction range",
+                    "post_window_context": "historical post-event behavior summary",
+                },
+                "market_view_proxy": "observed market setup or implied event-risk proxy",
+                "comparison_summary": (
+                    "plain-language statement describing whether the current setup appears "
+                    "cheap, rich, aligned, or indeterminate relative to the model view"
+                ),
+            },
         },
         "dataset_methodology": {
             "unit_of_analysis": (
@@ -175,12 +223,14 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "benchmark sponsor mapping accuracy against a reviewed sample",
                 "measure event-date proxy quality against known announcement dates where available",
                 "run descriptive backtests on event-day and post-window returns",
+                "formalize the probability, event-risk, and expected-reaction comparison layer",
                 "separate exploratory findings from out-of-sample claims",
             ],
             "claim_boundary": (
                 "The current system supports data engineering, event-study scaffolding, and QA. "
                 "It does not yet justify strong claims of exploitable mispricing, causal prediction, "
-                "or live trading edge without a larger validated dataset and formal backtests."
+                "or live trading edge without a larger validated dataset, formal backtests, and "
+                "validated market-comparison methodology."
             ),
         },
         "limitations": [
@@ -192,11 +242,13 @@ def build_methodology_snapshot() -> dict[str, Any]:
         ],
         "product_direction": {
             "research_value": (
-                "Provides a reproducible, inspectable dataset and workflow for biotech event studies."
+                "Provides a reproducible, inspectable dataset and workflow for biotech event studies, "
+                "with a path toward probability, event-risk, and expected-reaction comparison."
             ),
             "recruiter_value": (
                 "Demonstrates full-stack data engineering, API integration, entity resolution, "
-                "database design, workflow automation, and research framing."
+                "database design, workflow automation, and research framing around uncertainty-aware "
+                "biotech event analysis."
             ),
             "commercialization_direction": [
                 "internal biotech catalyst intelligence dashboard",
@@ -212,6 +264,7 @@ def render_methodology_markdown() -> str:
     snapshot = build_methodology_snapshot()
     project = snapshot["project_identity"]
     system_scope = snapshot["system_scope"]
+    final_output_framework = snapshot["final_output_framework"]
     dataset_methodology = snapshot["dataset_methodology"]
     event_methodology = snapshot["event_date_methodology"]
     sponsor_methodology = snapshot["sponsor_mapping_methodology"]
@@ -246,6 +299,27 @@ def render_methodology_markdown() -> str:
         "",
         "**Future capabilities**",
         bullet_list(system_scope["future_capabilities"]),
+        "",
+        "## Final Output Framework",
+        "",
+        f"**Objective:** {final_output_framework['objective']}",
+        "",
+        "**Core outputs**",
+        bullet_list(final_output_framework["core_outputs"]),
+        "",
+        "**Comparison layers**",
+        bullet_list(final_output_framework["comparison_layers"]),
+        "",
+        "**Non-goals**",
+        bullet_list(final_output_framework["non_goals"]),
+        "",
+        "**Example output contract**",
+        bullet_list(
+            [
+                f"`{key}`: {value if not isinstance(value, dict) else 'see structured subfields'}"
+                for key, value in final_output_framework["example_output_contract"].items()
+            ]
+        ),
         "",
         "## Dataset Methodology",
         "",

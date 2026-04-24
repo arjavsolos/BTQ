@@ -46,7 +46,8 @@ It is not responsible for:
 
 6. Modeling layer
 - use trial features, sponsor context, and prior data to estimate success probability
-- compare that to market-implied pricing
+- estimate event risk and expected reaction context from historical analogs
+- compare that modeled view to observed or market-implied event pricing
 
 ## Core System Principle
 
@@ -88,3 +89,20 @@ That record should:
 
 5. Build the modeling layer last
 - after the data pipeline is stable
+
+## Target Analytical Output
+
+The desired final system output is not an exact point-price target.
+
+The stronger architecture target is a comparison engine that produces:
+
+- modeled success probability
+- event-risk or catalyst-risk context
+- historical expected-reaction benchmarks
+- comparison against the observed or market-implied event setup
+
+In other words, the end of the architecture should answer:
+
+- what does the historical and modeled evidence suggest?
+- how uncertain is that estimate?
+- how does that compare with what the market appears to be pricing?
