@@ -146,6 +146,17 @@ class SponsorMappingReviewServiceTests(unittest.TestCase):
         self.assertEqual(record["reviewed_ticker"], "MRK")
         self.assertEqual(record["reviewed_mapping_status"], "approved_override")
 
+    def test_build_review_record_normalizes_reviewer_notes(self) -> None:
+        service = SponsorMappingReviewService(sec_mapper=_MapperStub())
+
+        record = service.build_review_record(
+            sponsor_name="Pfizer Inc.",
+            match_result=None,
+            review_notes="  reviewer   confirmed   this   manually.  ",
+        )
+
+        self.assertEqual(record["review_notes"], "reviewer confirmed this manually.")
+
     def test_queue_review_persists_when_review_is_needed(self) -> None:
         service = SponsorMappingReviewService(sec_mapper=_MapperStub())
         repository = _RepositoryStub()
@@ -226,6 +237,105 @@ class SponsorMappingReviewServiceTests(unittest.TestCase):
         self.assertEqual(record["reviewed_ticker"], "PFE")
         self.assertEqual(record["reviewed_company_name"], "Pfizer Inc.")
         self.assertEqual(record["reviewed_mapping_status"], "approved_suggested")
+
+    def test_submit_review_decision_appends_reviewer_notes_to_existing_history(self) -> None:
+        service = SponsorMappingReviewService(sec_mapper=_MapperStub())
+        repository = _RepositoryStub()
+        repository.reviews_by_name["pfizer"] = {
+            "review_id": 101,
+            "sponsor_name": "Pfizer Inc.",
+            "normalized_sponsor_name": "pfizer",
+            "source_nct_id": "NCT00000001",
+            "suggested_company_name": "Pfizer Inc.",
+            "suggested_ticker": "PFE",
+            "suggested_cik": "0000078003",
+            "suggested_confidence": 0.99,
+            "suggested_match_type": "exact_normalized",
+            "alternatives": [],
+            "review_status": "pending",
+            "reviewed_mapping_status": "unreviewed",
+            "reviewed_company_name": None,
+            "reviewed_ticker": None,
+            "reviewed_cik": None,
+            "reviewer_name": None,
+            "reviewer_email": None,
+            "review_notes": "[2026-04-23T12:00:00+00:00 | status=pending] existing note",
+            "reviewed_at": None,
+            "created_at": "2026-04-23T11:59:00+00:00",
+            "updated_at": "2026-04-23T12:00:00+00:00",
+        }
+
+        with (
+            patch(
+                "app.services.sponsor_mapping_review_service.get_connection",
+                return_value=_ConnectionStub(repository),
+            ),
+            patch(
+                "app.services.sponsor_mapping_review_service.SponsorMappingReviewRepository",
+                return_value=repository,
+            ),
+        ):
+            result = service.submit_review_decision(
+                sponsor_name="Pfizer Inc.",
+                review_status="approved",
+                reviewer_name="Arjav",
+                reviewer_email="arjaviyer@gmail.com",
+                review_notes="approved after manual sec cross-check",
+            )
+
+        notes = result["review_record"]["review_notes"]
+        self.assertIn("existing note", notes)
+        self.assertIn("approved after manual sec cross-check", notes)
+        self.assertIn("status=approved", notes)
+        self.assertIn("reviewer=Arjav", notes)
+
+    def test_submit_review_decision_preserves_existing_notes_when_new_note_is_blank(self) -> None:
+        service = SponsorMappingReviewService(sec_mapper=_MapperStub())
+        repository = _RepositoryStub()
+        repository.reviews_by_name["pfizer"] = {
+            "review_id": 101,
+            "sponsor_name": "Pfizer Inc.",
+            "normalized_sponsor_name": "pfizer",
+            "source_nct_id": "NCT00000001",
+            "suggested_company_name": "Pfizer Inc.",
+            "suggested_ticker": "PFE",
+            "suggested_cik": "0000078003",
+            "suggested_confidence": 0.99,
+            "suggested_match_type": "exact_normalized",
+            "alternatives": [],
+            "review_status": "pending",
+            "reviewed_mapping_status": "unreviewed",
+            "reviewed_company_name": None,
+            "reviewed_ticker": None,
+            "reviewed_cik": None,
+            "reviewer_name": None,
+            "reviewer_email": None,
+            "review_notes": "[2026-04-23T12:00:00+00:00 | status=pending] existing note",
+            "reviewed_at": None,
+            "created_at": "2026-04-23T11:59:00+00:00",
+            "updated_at": "2026-04-23T12:00:00+00:00",
+        }
+
+        with (
+            patch(
+                "app.services.sponsor_mapping_review_service.get_connection",
+                return_value=_ConnectionStub(repository),
+            ),
+            patch(
+                "app.services.sponsor_mapping_review_service.SponsorMappingReviewRepository",
+                return_value=repository,
+            ),
+        ):
+            result = service.submit_review_decision(
+                sponsor_name="Pfizer Inc.",
+                review_status="approved",
+                review_notes="   ",
+            )
+
+        self.assertEqual(
+            result["review_record"]["review_notes"],
+            "[2026-04-23T12:00:00+00:00 | status=pending] existing note",
+        )
 
     def test_apply_review_override_prefers_approved_override_mapping(self) -> None:
         service = SponsorMappingReviewService(sec_mapper=_MapperStub())

@@ -246,6 +246,32 @@ This structure is important because it preserves:
 
 That makes the workflow auditable instead of opaque.
 
+## How Reviewer Notes Work
+
+Reviewer notes are intended to capture the reasoning behind a sponsor-mapping decision.
+
+Examples of useful notes include:
+
+- why the reviewer approved the machine suggestion
+- why the reviewer overrode the suggested ticker
+- what SEC filing or public-company evidence was used
+- whether the sponsor string was ambiguous or represented a subsidiary, affiliate, or private entity
+
+BTQ now treats reviewer notes as a running audit trail rather than as a disposable one-time comment.
+
+In practice, that means:
+
+- note text is normalized so messy spacing does not create noisy records
+- new reviewer notes are appended to existing note history instead of silently overwriting it
+- appended note entries carry decision context such as review status and reviewer identity when available
+
+That makes the review log much more useful later for:
+
+- sponsor-mapping error analysis
+- manual QA
+- reviewer handoff
+- writing methodology and limitations sections
+
 ## What Review Status Means
 
 The review table currently supports a `review_status` field.

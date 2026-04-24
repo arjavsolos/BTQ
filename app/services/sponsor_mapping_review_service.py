@@ -25,6 +25,53 @@ class SponsorMappingReviewService:
     def normalize_sponsor_name(self, sponsor_name: str | None) -> str:
         return self.sec_mapper._normalize_company_name(sponsor_name)
 
+    def _normalize_review_notes(self, review_notes: str | None) -> str | None:
+        if review_notes is None:
+            return None
+        clean_review_notes = " ".join(str(review_notes).split()).strip()
+        return clean_review_notes or None
+
+    def _compose_review_note_entry(
+        self,
+        review_notes: str,
+        review_status: str,
+        reviewer_name: str | None = None,
+        reviewer_email: str | None = None,
+    ) -> str:
+        timestamp = datetime.now(UTC).isoformat()
+        note_parts = [timestamp, f"status={review_status}"]
+        if reviewer_name:
+            note_parts.append(f"reviewer={reviewer_name.strip()}")
+        if reviewer_email:
+            note_parts.append(f"email={reviewer_email.strip()}")
+        prefix = " | ".join(note_parts)
+        return f"[{prefix}] {review_notes}"
+
+    def _merge_review_notes(
+        self,
+        existing_review_notes: str | None,
+        new_review_notes: str | None,
+        review_status: str,
+        reviewer_name: str | None = None,
+        reviewer_email: str | None = None,
+    ) -> str | None:
+        clean_existing_review_notes = self._normalize_review_notes(existing_review_notes)
+        clean_new_review_notes = self._normalize_review_notes(new_review_notes)
+        if clean_new_review_notes is None:
+            return clean_existing_review_notes
+
+        note_entry = self._compose_review_note_entry(
+            review_notes=clean_new_review_notes,
+            review_status=review_status,
+            reviewer_name=reviewer_name,
+            reviewer_email=reviewer_email,
+        )
+        if clean_existing_review_notes is None:
+            return note_entry
+        if note_entry in clean_existing_review_notes:
+            return clean_existing_review_notes
+        return f"{clean_existing_review_notes}\n{note_entry}"
+
     def _derive_reviewed_mapping_status(
         self,
         review_status: str,
@@ -164,7 +211,7 @@ class SponsorMappingReviewService:
             "reviewed_cik": reviewed_cik_value,
             "reviewer_name": reviewer_name,
             "reviewer_email": reviewer_email,
-            "review_notes": review_notes,
+            "review_notes": self._normalize_review_notes(review_notes),
             "reviewed_at": reviewed_at,
         }
 
@@ -225,6 +272,13 @@ class SponsorMappingReviewService:
                         if existing_review is not None
                         else match_payload.get("cik")
                     )
+            merged_review_notes = self._merge_review_notes(
+                existing_review_notes=None if existing_review is None else existing_review.get("review_notes"),
+                new_review_notes=review_notes,
+                review_status=clean_review_status,
+                reviewer_name=reviewer_name,
+                reviewer_email=reviewer_email,
+            )
 
             review_record = self.build_review_record(
                 sponsor_name=sponsor_name,
@@ -235,7 +289,7 @@ class SponsorMappingReviewService:
                 reviewed_mapping_status=reviewed_mapping_status,
                 reviewer_name=reviewer_name,
                 reviewer_email=reviewer_email,
-                review_notes=review_notes,
+                review_notes=merged_review_notes,
                 reviewed_company_name=resolved_reviewed_company_name,
                 reviewed_ticker=resolved_reviewed_ticker,
                 reviewed_cik=resolved_reviewed_cik,
