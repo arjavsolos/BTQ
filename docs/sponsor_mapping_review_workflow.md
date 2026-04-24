@@ -203,6 +203,7 @@ Important fields include:
 - `suggested_match_type`
 - `alternatives`
 - `review_status`
+- `reviewed_mapping_status`
 - `reviewed_company_name`
 - `reviewed_ticker`
 - `reviewed_cik`
@@ -245,6 +246,60 @@ The review has been accepted and a final reviewed identity can be trusted for la
 The machine-generated suggestion should not be trusted as the final mapping.
 
 Future states could be added later if needed, but these three cover the current workflow well.
+
+## What Reviewed Mapping Status Means
+
+The table also stores a separate field:
+
+- `reviewed_mapping_status`
+
+This is different from `review_status`.
+
+The easiest way to think about it is:
+
+- `review_status` answers: has someone reviewed this row yet?
+- `reviewed_mapping_status` answers: what was the actual mapping outcome?
+
+That distinction matters because an approved review can still mean two different things:
+
+- the reviewer accepted the machine-suggested mapping
+- the reviewer overrode the machine suggestion and chose a different mapping
+
+The current intended values are:
+
+- `unreviewed`
+- `approved_suggested`
+- `approved_override`
+- `rejected`
+
+The meaning of each state is:
+
+### `unreviewed`
+
+The row is still waiting for human review, so no final mapping outcome has been accepted yet.
+
+### `approved_suggested`
+
+The reviewer approved the same company identity that the machine originally suggested.
+
+This is the best-case outcome for a strong but review-worthy match because it confirms that the automated mapping was directionally correct.
+
+### `approved_override`
+
+The reviewer approved the row, but changed the final company identity away from the original machine suggestion.
+
+This is especially important analytically because it lets BTQ distinguish:
+
+- machine suggestions that were correct
+- machine suggestions that needed human correction
+
+That will matter later for sponsor-mapping evaluation and error analysis.
+
+### `rejected`
+
+The machine suggestion was not accepted as a valid final mapping.
+
+In practice, this means the row should not be treated as a clean reviewed sponsor-to-ticker identity unless additional work is done later.
 
 ## Why Alternatives Matter
 

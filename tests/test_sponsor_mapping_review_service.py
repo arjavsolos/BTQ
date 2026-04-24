@@ -101,6 +101,7 @@ class SponsorMappingReviewServiceTests(unittest.TestCase):
         self.assertEqual(record["suggested_ticker"], "PFE")
         self.assertEqual(record["source_nct_id"], "NCT00000001")
         self.assertEqual(record["alternatives"], [{"ticker": "PFE"}])
+        self.assertEqual(record["reviewed_mapping_status"], "unreviewed")
 
     def test_build_review_record_sets_reviewed_at_for_terminal_status(self) -> None:
         service = SponsorMappingReviewService(sec_mapper=_MapperStub())
@@ -113,8 +114,31 @@ class SponsorMappingReviewServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(record["review_status"], "approved")
+        self.assertEqual(record["reviewed_mapping_status"], "approved_suggested")
         self.assertEqual(record["reviewed_ticker"], "PFE")
         self.assertIsNotNone(record["reviewed_at"])
+
+    def test_build_review_record_tracks_override_status(self) -> None:
+        service = SponsorMappingReviewService(sec_mapper=_MapperStub())
+
+        record = service.build_review_record(
+            sponsor_name="Pfizer Inc.",
+            match_result={
+                "matched_company_name": "Pfizer Inc.",
+                "ticker": "PFE",
+                "cik": "0000078003",
+                "confidence": 0.99,
+                "match_type": "exact_normalized",
+                "alternatives": [],
+            },
+            review_status="approved",
+            reviewed_ticker="MRK",
+        )
+
+        self.assertEqual(record["review_status"], "approved")
+        self.assertEqual(record["suggested_ticker"], "PFE")
+        self.assertEqual(record["reviewed_ticker"], "MRK")
+        self.assertEqual(record["reviewed_mapping_status"], "approved_override")
 
     def test_queue_review_persists_when_review_is_needed(self) -> None:
         service = SponsorMappingReviewService(sec_mapper=_MapperStub())

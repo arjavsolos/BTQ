@@ -211,6 +211,7 @@ create table if not exists sponsor_mapping_reviews (
   suggested_match_type text,
   alternatives jsonb not null default '[]'::jsonb,
   review_status text not null default 'pending',
+  reviewed_mapping_status text not null default 'unreviewed',
   reviewed_company_name text,
   reviewed_ticker text,
   reviewed_cik text,
@@ -233,6 +234,10 @@ SPONSOR_MAPPING_REVIEWS_INDEX_SQL = [
     (
         "create index if not exists sponsor_mapping_reviews_suggested_ticker_idx "
         "on sponsor_mapping_reviews (suggested_ticker);"
+    ),
+    (
+        "create index if not exists sponsor_mapping_reviews_reviewed_mapping_status_idx "
+        "on sponsor_mapping_reviews (reviewed_mapping_status);"
     ),
     (
         "create index if not exists sponsor_mapping_reviews_source_nct_id_idx "

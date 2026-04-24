@@ -25,6 +25,30 @@ class SponsorMappingReviewService:
     def normalize_sponsor_name(self, sponsor_name: str | None) -> str:
         return self.sec_mapper._normalize_company_name(sponsor_name)
 
+    def _derive_reviewed_mapping_status(
+        self,
+        review_status: str,
+        suggested_ticker: str | None,
+        reviewed_ticker: str | None,
+        explicit_status: str | None = None,
+    ) -> str:
+        if explicit_status:
+            return explicit_status.strip().lower()
+
+        clean_review_status = (review_status or "").strip().lower()
+        clean_suggested_ticker = (suggested_ticker or "").strip().upper() or None
+        clean_reviewed_ticker = (reviewed_ticker or "").strip().upper() or None
+
+        if clean_review_status == "pending":
+            return "unreviewed"
+        if clean_review_status == "rejected":
+            return "rejected"
+        if clean_review_status == "approved":
+            if clean_reviewed_ticker and clean_suggested_ticker and clean_reviewed_ticker != clean_suggested_ticker:
+                return "approved_override"
+            return "approved_suggested"
+        return "unreviewed"
+
     def _coerce_match_payload(self, match_result: SponsorMatchResult | dict[str, Any] | None) -> dict[str, Any]:
         if match_result is None:
             return {}
@@ -52,6 +76,7 @@ class SponsorMappingReviewService:
         match_result: SponsorMatchResult | dict[str, Any] | None,
         source_nct_id: str | None = None,
         review_status: str = "pending",
+        reviewed_mapping_status: str | None = None,
         reviewer_name: str | None = None,
         reviewer_email: str | None = None,
         review_notes: str | None = None,
@@ -74,6 +99,12 @@ class SponsorMappingReviewService:
         clean_reviewed_ticker = (reviewed_ticker or "").strip().upper() or None
         suggested_cik = match_payload.get("cik")
         reviewed_cik_value = (reviewed_cik or "").strip() or None
+        clean_reviewed_mapping_status = self._derive_reviewed_mapping_status(
+            review_status=clean_review_status,
+            suggested_ticker=clean_suggested_ticker,
+            reviewed_ticker=clean_reviewed_ticker,
+            explicit_status=reviewed_mapping_status,
+        )
 
         if clean_review_status in {"approved", "rejected"} and reviewed_at is None:
             reviewed_at = datetime.now(UTC).isoformat()
@@ -89,6 +120,7 @@ class SponsorMappingReviewService:
             "suggested_match_type": match_payload.get("match_type"),
             "alternatives": match_payload.get("alternatives") or [],
             "review_status": clean_review_status,
+            "reviewed_mapping_status": clean_reviewed_mapping_status,
             "reviewed_company_name": reviewed_company_name,
             "reviewed_ticker": clean_reviewed_ticker,
             "reviewed_cik": reviewed_cik_value,

@@ -76,6 +76,7 @@ class SponsorMappingReviewRepositoryTests(unittest.TestCase):
                 "suggested_match_type": "exact_normalized",
                 "alternatives": [{"ticker": "PFE", "confidence": 1.0}],
                 "review_status": "pending",
+                "reviewed_mapping_status": "unreviewed",
             }
         )
 
@@ -101,6 +102,7 @@ class SponsorMappingReviewRepositoryTests(unittest.TestCase):
                 "exact_normalized",
                 [{"ticker": "PFE", "confidence": 0.99}],
                 "pending",
+                "unreviewed",
                 None,
                 None,
                 None,
@@ -120,6 +122,7 @@ class SponsorMappingReviewRepositoryTests(unittest.TestCase):
         assert review is not None
         self.assertEqual(review["review_id"], 7)
         self.assertEqual(review["suggested_ticker"], "PFE")
+        self.assertEqual(review["reviewed_mapping_status"], "unreviewed")
         self.assertEqual(review["alternatives"][0]["ticker"], "PFE")
 
     def test_list_reviews_applies_filters_and_returns_rows(self) -> None:
@@ -138,6 +141,7 @@ class SponsorMappingReviewRepositoryTests(unittest.TestCase):
                     "exact_normalized",
                     [],
                     "approved",
+                    "approved_suggested",
                     "Pfizer Inc.",
                     "PFE",
                     "0000078003",
@@ -156,6 +160,7 @@ class SponsorMappingReviewRepositoryTests(unittest.TestCase):
 
         self.assertEqual(len(reviews), 1)
         self.assertEqual(reviews[0]["review_status"], "approved")
+        self.assertEqual(reviews[0]["reviewed_mapping_status"], "approved_suggested")
         statement, params = connection.executed[0]
         self.assertIn("where review_status = %s and suggested_ticker = %s", statement)
         self.assertEqual(params, ("approved", "PFE", 25, 5))

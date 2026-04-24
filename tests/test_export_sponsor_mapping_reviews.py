@@ -51,8 +51,18 @@ class ExportSponsorMappingReviewsScriptTests(unittest.TestCase):
     def test_main_outputs_json_payload_with_summary(self) -> None:
         repository = _RepositoryStub(
             [
-                {"review_id": 1, "review_status": "pending", "suggested_ticker": "PFE"},
-                {"review_id": 2, "review_status": "approved", "suggested_ticker": "MRK"},
+                {
+                    "review_id": 1,
+                    "review_status": "pending",
+                    "reviewed_mapping_status": "unreviewed",
+                    "suggested_ticker": "PFE",
+                },
+                {
+                    "review_id": 2,
+                    "review_status": "approved",
+                    "reviewed_mapping_status": "approved_suggested",
+                    "suggested_ticker": "MRK",
+                },
             ]
         )
         stdout = io.StringIO()
@@ -102,8 +112,12 @@ class ExportSponsorMappingReviewsScriptTests(unittest.TestCase):
     def test_main_outputs_jsonl_lines_without_summary_wrapper(self) -> None:
         repository = _RepositoryStub(
             [
-                {"review_id": 1, "review_status": "pending"},
-                {"review_id": 2, "review_status": "approved"},
+                {"review_id": 1, "review_status": "pending", "reviewed_mapping_status": "unreviewed"},
+                {
+                    "review_id": 2,
+                    "review_status": "approved",
+                    "reviewed_mapping_status": "approved_suggested",
+                },
             ]
         )
         stdout = io.StringIO()
