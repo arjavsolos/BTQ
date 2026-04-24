@@ -82,6 +82,7 @@ jobs:
 
     env:
       PYTHONPATH: .
+      DATABASE_TARGET: local
       DB_HOST: localhost
       DB_PORT: "5432"
       DB_NAME: btq_test
