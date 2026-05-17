@@ -20,6 +20,29 @@ class _ClinicalStub:
             "event_date_source_rank": 4,
             "event_date_quality_score": 95,
             "event_date_quality_tier": "high",
+            "event_date_quality_issues": [],
+        }
+
+
+class _ClinicalLowQualityStub:
+    def fetch_trial_data(self, nct_id: str, include_raw: bool = False) -> dict:
+        return {
+            "nct_id": nct_id,
+            "brief_title": "Example Trial",
+            "sponsor_name": "Pfizer Inc",
+            "phase_label": "PHASE2",
+            "overall_status": "COMPLETED",
+            "therapeutic_area": "Oncology",
+            "event_date_candidate": "2025-01",
+            "event_date_source": "last_update_posted",
+            "event_date_source_rank": 1,
+            "event_date_quality_score": 38,
+            "event_date_quality_tier": "low",
+            "event_date_quality_issues": [
+                "non_day_precision_event_date",
+                "low_rank_event_date_source",
+                "low_confidence_event_date",
+            ],
         }
 
 
@@ -122,6 +145,38 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["market_data"]["ticker"], "MRK")
         self.assertIn(
             "Sponsor mapping used a reviewed override instead of the raw SEC match.",
+            result["warnings"],
+        )
+
+    def test_analyze_trial_surfaces_low_event_date_quality_warnings(self) -> None:
+        service = TrialAnalysisService(
+            clinical_trials_ingestor=_ClinicalLowQualityStub(),
+            sec_mapper=_SecStub(),
+            openfda_ingestor=_OpenFDAStub(),
+            market_data_ingestor=_MarketStub(),
+            sponsor_mapping_review_service=_SponsorReviewStub(),
+        )
+
+        result = service.analyze_trial("NCT00000002")
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["summary"]["event_date_quality_tier"], "low")
+        self.assertIsNone(result["market_data"])
+        self.assertIn(
+            "Event date quality is low, so the selected catalyst date may be a weak "
+            "proxy for the true market-moving event.",
+            result["warnings"],
+        )
+        self.assertIn(
+            "Event date relies on a lower-ranked proxy source instead of a primary completion milestone.",
+            result["warnings"],
+        )
+        self.assertIn(
+            "Event date confidence is low based on the available source and date precision.",
+            result["warnings"],
+        )
+        self.assertIn(
+            "Event date is not day-precision, so market event-window analysis was skipped.",
             result["warnings"],
         )
 

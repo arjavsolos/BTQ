@@ -25,6 +25,7 @@ from app.ingestion import (
     OpenFDAIngestor,
     SecCompanyMapper,
 )
+from app.services.event_date_quality_service import EventDateQualityService
 from app.services.historical_trial_event_service import HistoricalTrialEventService
 from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
@@ -55,6 +56,7 @@ class TrialAnalysisService:
             sec_mapper=self.sec_mapper
         )
         self.persist_trial_records = persist_trial_records
+        self.event_date_quality_service = EventDateQualityService()
         self.historical_event_service = HistoricalTrialEventService()
 
     def _normalize_warnings(self, warnings: list[str]) -> list[str]:
@@ -120,6 +122,48 @@ class TrialAnalysisService:
         except Exception as exc:
             warnings.append(f"SEC sponsor mapping failed: {exc}")
             return None, warnings
+
+    def _build_event_date_quality_warnings(self, trial: dict[str, Any]) -> list[str]:
+        assessment = self.event_date_quality_service.assess_event_date(
+            event_date_value=trial.get("event_date_candidate"),
+            event_date_source=trial.get("event_date_source"),
+        )
+
+        warnings: list[str] = []
+        quality_tier = str(
+            trial.get("event_date_quality_tier")
+            or assessment.get("event_date_quality_tier")
+            or "unknown"
+        )
+        quality_issues = list(
+            trial.get("event_date_quality_issues")
+            or assessment.get("event_date_quality_issues")
+            or []
+        )
+
+        if quality_tier == "moderate":
+            warnings.append(
+                "Event date quality is moderate, so catalyst timing may be less reliable "
+                "than a direct completion milestone."
+            )
+        elif quality_tier == "low":
+            warnings.append(
+                "Event date quality is low, so the selected catalyst date may be a weak "
+                "proxy for the true market-moving event."
+            )
+        elif quality_tier == "unknown":
+            warnings.append("Event date quality is unknown because the available catalyst-date metadata is incomplete.")
+
+        if "low_rank_event_date_source" in quality_issues:
+            warnings.append(
+                "Event date relies on a lower-ranked proxy source instead of a primary "
+                "completion milestone."
+            )
+        if "low_confidence_event_date" in quality_issues:
+            warnings.append("Event date confidence is low based on the available source and date precision.")
+        if "unknown_event_date_precision" in quality_issues:
+            warnings.append("Event date precision could not be classified confidently from the source metadata.")
+        return warnings
 
     def _fetch_market_summary(
         self,
@@ -206,6 +250,7 @@ class TrialAnalysisService:
         warnings: list[str] = []
 
         trial = self.clinical_trials_ingestor.fetch_trial_data(nct_id, include_raw=include_raw_trial)
+        warnings.extend(self._build_event_date_quality_warnings(trial))
         sponsor_mapping, sponsor_warnings = self._normalize_sponsor_mapping(trial.get("sponsor_name"))
         warnings.extend(sponsor_warnings)
 

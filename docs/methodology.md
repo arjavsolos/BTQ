@@ -183,6 +183,7 @@ The scoring layer then turns that proxy into a more usable quality signal:
 - `event_date_quality_score` is a `0-100` heuristic score built from precision, source rank, and confidence
 - `event_date_quality_tier` compresses that score into `high`, `moderate`, `low`, or `unknown`
 - quality issues preserve why a chosen date may still be weak even when the row is retained for audit visibility
+- trial analysis surfaces explicit warnings when event-date quality is moderate, low, or otherwise incomplete
 
 This is one of the most important methodological safeguards in the entire project because it prevents hidden assumptions about catalyst timing.
 
