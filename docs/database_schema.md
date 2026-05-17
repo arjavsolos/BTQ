@@ -105,6 +105,9 @@ The `clinical_trials` table is the canonical storage layer for normalized trial 
 - `event_date_source_rank` `INTEGER`
 - `event_date_precision` `TEXT`
 - `event_date_confidence` `TEXT`
+- `event_date_quality_score` `INTEGER`
+- `event_date_quality_tier` `TEXT`
+- `event_date_quality_issues` `JSONB`
 
 ### Site and geography data
 
@@ -137,6 +140,7 @@ The `clinical_trials` table is the canonical storage layer for normalized trial 
 - `INDEX clinical_trials_therapeutic_area_idx ON clinical_trials (therapeutic_area)`
 - `INDEX clinical_trials_event_date_candidate_idx ON clinical_trials (event_date_candidate)`
 - `INDEX clinical_trials_event_date_source_rank_idx ON clinical_trials (event_date_source_rank)`
+- `INDEX clinical_trials_event_date_quality_score_idx ON clinical_trials (event_date_quality_score)`
 - `INDEX clinical_trials_has_results_idx ON clinical_trials (has_results)`
 
 ## Recommended JSONB Index Targets
@@ -188,6 +192,8 @@ Core fields:
 - `event_date_source`
 - `event_date_source_rank`
 - `event_date_confidence`
+- `event_date_quality_score`
+- `event_date_quality_tier`
 - `pre_event_close`
 - `event_close`
 - `post_1d_return`
@@ -201,6 +207,7 @@ Core fields:
 - Date fields are currently stored as strings because ClinicalTrials.gov sometimes returns partial dates like `2008-10`.
 - `event_date_confidence` captures the current heuristic confidence level of the chosen catalyst-date proxy.
 - `event_date_source_rank` makes the source-precedence model queryable and auditable in SQL.
+- `event_date_quality_score` and `event_date_quality_tier` make event-date quality usable in downstream cohorts, audits, and models.
 - Nested arrays and source-rich objects should remain JSONB until there is a proven need to normalize them further.
 
 ## Minimal SQL Shape
@@ -268,6 +275,9 @@ create table clinical_trials (
   event_date_source_rank integer,
   event_date_precision text,
   event_date_confidence text,
+  event_date_quality_score integer,
+  event_date_quality_tier text,
+  event_date_quality_issues jsonb,
   locations jsonb,
   location_count integer,
   country_counts jsonb,

@@ -78,6 +78,9 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertEqual(record["event_date_source"], "primary_completion_date")
         self.assertEqual(record["event_date_source_rank"], 4)
         self.assertEqual(record["event_date_confidence"], "high")
+        self.assertEqual(record["event_date_quality_score"], 95)
+        self.assertEqual(record["event_date_quality_tier"], "high")
+        self.assertEqual(record["event_date_quality_issues"], [])
         self.assertTrue(record["has_primary_outcomes"])
         self.assertTrue(record["has_locations"])
         self.assertTrue(record["has_results"])
@@ -104,6 +107,8 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertEqual(record["event_date_source_rank"], 2)
         self.assertEqual(record["event_date_precision"], "day")
         self.assertEqual(record["event_date_confidence"], "moderate")
+        self.assertEqual(record["event_date_quality_score"], 71)
+        self.assertEqual(record["event_date_quality_tier"], "moderate")
 
     def test_extract_trial_record_scores_low_confidence_for_fallback_event_date(self) -> None:
         ingestor = ClinicalTrialsIngestor()
@@ -122,6 +127,8 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertEqual(record["event_date_source"], "last_update_posted")
         self.assertEqual(record["event_date_source_rank"], 1)
         self.assertEqual(record["event_date_confidence"], "low")
+        self.assertEqual(record["event_date_quality_score"], 58)
+        self.assertEqual(record["event_date_quality_tier"], "moderate")
 
     def test_extract_trial_record_prefers_higher_ranked_source_when_precision_ties(self) -> None:
         ingestor = ClinicalTrialsIngestor()

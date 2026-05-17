@@ -18,6 +18,8 @@ class _ClinicalStub:
             "event_date_candidate": "2025-01-15",
             "event_date_source": "primary_completion_date",
             "event_date_source_rank": 4,
+            "event_date_quality_score": 95,
+            "event_date_quality_tier": "high",
         }
 
 
@@ -98,6 +100,8 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["summary"]["mapped_ticker"], "PFE")
         self.assertEqual(result["summary"]["event_date_source_rank"], 4)
+        self.assertEqual(result["summary"]["event_date_quality_score"], 95)
+        self.assertEqual(result["summary"]["event_date_quality_tier"], "high")
         self.assertEqual(result["fda_context"]["approval_record_count"], 1)
         self.assertEqual(result["market_data"]["event_day_return"], 0.123)
         self.assertEqual(result["warnings"], [])

@@ -42,6 +42,7 @@ JSON_FIELDS = {
     "derived_misc_info",
     "central_contacts",
     "overall_officials",
+    "event_date_quality_issues",
 }
 
 HISTORICAL_EVENT_JSON_FIELDS = {
@@ -123,6 +124,9 @@ TRIAL_COLUMNS = [
     "event_date_source_rank",
     "event_date_precision",
     "event_date_confidence",
+    "event_date_quality_score",
+    "event_date_quality_tier",
+    "event_date_quality_issues",
     "locations",
     "location_count",
     "country_counts",
@@ -379,6 +383,8 @@ HISTORICAL_EVENT_COLUMNS = [
     "event_date_source_rank",
     "event_date_precision",
     "event_date_confidence",
+    "event_date_quality_score",
+    "event_date_quality_tier",
     "mapped_ticker",
     "mapped_cik",
     "matched_company_name",
@@ -527,8 +533,12 @@ class HistoricalTrialEventRepository:
             count(*) filter (
                 where data_completeness_ratio is null or data_completeness_ratio < 0.7
             ) as low_completeness_events,
+            count(*) filter (
+                where event_date_quality_score is null or event_date_quality_score < 55
+            ) as low_event_date_quality_events,
             avg(data_completeness_ratio) as average_data_completeness_ratio,
             avg(mapping_confidence) as average_mapping_confidence,
+            avg(event_date_quality_score) as average_event_date_quality_score,
             avg(event_day_return) as average_event_day_return,
             avg(post_window_return) as average_post_window_return
         from historical_trial_events;
@@ -548,10 +558,12 @@ class HistoricalTrialEventRepository:
             "missing_mapping_confidence_events": row[8],
             "low_confidence_mapping_events": row[9],
             "low_completeness_events": row[10],
-            "average_data_completeness_ratio": row[11],
-            "average_mapping_confidence": row[12],
-            "average_event_day_return": row[13],
-            "average_post_window_return": row[14],
+            "low_event_date_quality_events": row[11],
+            "average_data_completeness_ratio": row[12],
+            "average_mapping_confidence": row[13],
+            "average_event_date_quality_score": row[14],
+            "average_event_day_return": row[15],
+            "average_post_window_return": row[16],
         }
 
     def get_phase_breakdown(self) -> list[dict[str, Any]]:
@@ -654,6 +666,26 @@ class HistoricalTrialEventRepository:
         return [
             {
                 "event_date_confidence": row[0],
+                "event_count": row[1],
+            }
+            for row in rows
+        ]
+
+    def get_event_date_quality_tier_breakdown(self) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(nullif(event_date_quality_tier, ''), 'UNKNOWN') as event_date_quality_tier,
+            count(*) as event_count
+        from historical_trial_events
+        group by 1
+        order by event_count desc, event_date_quality_tier asc;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        return [
+            {
+                "event_date_quality_tier": row[0],
                 "event_count": row[1],
             }
             for row in rows

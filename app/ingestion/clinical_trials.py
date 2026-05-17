@@ -8,6 +8,8 @@ from typing import Any
 
 import requests
 
+from app.services.event_date_quality_service import EVENT_DATE_SOURCE_RANKS, EventDateQualityService
+
 API_BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
 SOURCE_SYSTEM = "clinicaltrials.gov"
 SOURCE_API_VERSION = "v2"
@@ -54,14 +56,6 @@ KEYWORD_BUCKETS = {
     ],
 }
 
-EVENT_DATE_SOURCE_RANKS = {
-    "last_update_posted": 1,
-    "results_first_posted": 2,
-    "completion_date": 3,
-    "primary_completion_date": 4,
-}
-
-
 @dataclass(slots=True)
 class TrialQuery:
     query_term: str | None = None
@@ -95,6 +89,7 @@ class ClinicalTrialsIngestor:
         self.timeout = timeout
         self.max_retries = max(1, max_retries)
         self.retry_backoff_seconds = max(0.0, retry_backoff_seconds)
+        self.event_date_quality_service = EventDateQualityService()
         self.session = requests.Session()
         self.session.trust_env = use_env_proxy
         self.session.headers.update(
@@ -166,44 +161,20 @@ class ClinicalTrialsIngestor:
         return max(values) if values else None
 
     def _infer_date_precision(self, value: str | None) -> str | None:
-        if not value:
-            return None
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
-            return "day"
-        if re.fullmatch(r"\d{4}-\d{2}", value):
-            return "month"
-        if re.fullmatch(r"\d{4}", value):
-            return "year"
-        return "unknown"
+        return self.event_date_quality_service.infer_precision(value)
 
     def _score_event_date_confidence(
         self,
         event_date_value: str | None,
         event_date_source: str | None,
     ) -> str:
-        precision = self._infer_date_precision(event_date_value)
-        if not event_date_value or not event_date_source or precision is None:
-            return "unknown"
-
-        if precision == "day":
-            if event_date_source in {"primary_completion_date", "completion_date"}:
-                return "high"
-            if event_date_source == "results_first_posted":
-                return "moderate"
-            if event_date_source == "last_update_posted":
-                return "low"
-        if precision == "month":
-            if event_date_source in {"primary_completion_date", "completion_date"}:
-                return "moderate"
-            return "low"
-        if precision == "year":
-            return "low"
-        return "unknown"
+        return self.event_date_quality_service.score_confidence(
+            event_date_value=event_date_value,
+            event_date_source=event_date_source,
+        )
 
     def _rank_event_date_source(self, event_date_source: str | None) -> int | None:
-        if not event_date_source:
-            return None
-        return EVENT_DATE_SOURCE_RANKS.get(event_date_source)
+        return self.event_date_quality_service.rank_source(event_date_source)
 
     def _choose_event_date(
         self,
@@ -398,6 +369,10 @@ class ClinicalTrialsIngestor:
         country_counts = self._country_counts(location_rows)
         reference_rows = self._extract_references(references)
         event_date_candidate, event_date_source = self._choose_event_date(status)
+        event_date_quality = self.event_date_quality_service.assess_event_date(
+            event_date_value=event_date_candidate,
+            event_date_source=event_date_source,
+        )
 
         conditions_list = conditions.get("conditions", [])
         keyword_hits = self._collect_keywords(
@@ -468,12 +443,12 @@ class ClinicalTrialsIngestor:
             "last_update_posted": (status.get("lastUpdatePostDateStruct") or {}).get("date"),
             "event_date_candidate": event_date_candidate,
             "event_date_source": event_date_source,
-            "event_date_source_rank": self._rank_event_date_source(event_date_source),
-            "event_date_precision": self._infer_date_precision(event_date_candidate),
-            "event_date_confidence": self._score_event_date_confidence(
-                event_date_candidate,
-                event_date_source,
-            ),
+            "event_date_source_rank": event_date_quality["event_date_source_rank"],
+            "event_date_precision": event_date_quality["event_date_precision"],
+            "event_date_confidence": event_date_quality["event_date_confidence"],
+            "event_date_quality_score": event_date_quality["event_date_quality_score"],
+            "event_date_quality_tier": event_date_quality["event_date_quality_tier"],
+            "event_date_quality_issues": event_date_quality["event_date_quality_issues"],
             "locations": location_rows,
             "location_count": len(location_rows),
             "country_counts": country_counts,
@@ -602,6 +577,8 @@ class ClinicalTrialsIngestor:
             "event_date_candidate": record.get("event_date_candidate"),
             "event_date_source": record.get("event_date_source"),
             "event_date_source_rank": record.get("event_date_source_rank"),
+            "event_date_quality_score": record.get("event_date_quality_score"),
+            "event_date_quality_tier": record.get("event_date_quality_tier"),
             "has_results": record.get("has_results"),
             "data_completeness_score": record.get("data_completeness_score"),
         }

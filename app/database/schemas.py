@@ -61,6 +61,9 @@ create table if not exists clinical_trials (
   event_date_source_rank integer,
   event_date_precision text,
   event_date_confidence text,
+  event_date_quality_score integer,
+  event_date_quality_tier text,
+  event_date_quality_issues jsonb,
   locations jsonb,
   location_count integer,
   country_counts jsonb,
@@ -102,6 +105,10 @@ CLINICAL_TRIALS_INDEX_SQL = [
         "create index if not exists clinical_trials_event_date_source_rank_idx "
         "on clinical_trials (event_date_source_rank);"
     ),
+    (
+        "create index if not exists clinical_trials_event_date_quality_score_idx "
+        "on clinical_trials (event_date_quality_score);"
+    ),
     "create index if not exists clinical_trials_has_results_idx on clinical_trials (has_results);",
 ]
 
@@ -109,6 +116,9 @@ CLINICAL_TRIALS_INDEX_SQL = [
 CLINICAL_TRIALS_MIGRATION_SQL = [
     "alter table clinical_trials add column if not exists event_date_source_rank integer;",
     "alter table clinical_trials add column if not exists event_date_confidence text;",
+    "alter table clinical_trials add column if not exists event_date_quality_score integer;",
+    "alter table clinical_trials add column if not exists event_date_quality_tier text;",
+    "alter table clinical_trials add column if not exists event_date_quality_issues jsonb;",
 ]
 
 
@@ -167,6 +177,8 @@ create table if not exists historical_trial_events (
   event_date_source_rank integer,
   event_date_precision text,
   event_date_confidence text,
+  event_date_quality_score integer,
+  event_date_quality_tier text,
   mapped_ticker text,
   mapped_cik text,
   matched_company_name text,
@@ -213,6 +225,10 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
         "on historical_trial_events (event_date_confidence);"
     ),
     (
+        "create index if not exists historical_trial_events_event_date_quality_score_idx "
+        "on historical_trial_events (event_date_quality_score);"
+    ),
+    (
         "create index if not exists historical_trial_events_model_ready_idx "
         "on historical_trial_events (is_model_ready);"
     ),
@@ -223,6 +239,8 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
 HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL = [
     "alter table historical_trial_events add column if not exists event_date_source_rank integer;",
     "alter table historical_trial_events add column if not exists event_date_confidence text;",
+    "alter table historical_trial_events add column if not exists event_date_quality_score integer;",
+    "alter table historical_trial_events add column if not exists event_date_quality_tier text;",
 ]
 
 

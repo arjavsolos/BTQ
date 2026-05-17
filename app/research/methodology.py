@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-METHODOLOGY_VERSION = "1.2"
+METHODOLOGY_VERSION = "1.3"
 
 
 def build_methodology_snapshot() -> dict[str, Any]:
@@ -186,6 +186,11 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "If two candidates have the same precision, the higher-ranked source is preferred.",
                 "Market event-window analysis only runs when the chosen event date is day precision.",
             ],
+            "quality_scoring": [
+                "event_date_quality_score combines precision, source rank, and confidence into a 0-100 heuristic score",
+                "event_date_quality_tier compresses that score into high, moderate, low, or unknown",
+                "quality issues preserve why a chosen catalyst-date proxy may be weak even when it is still stored",
+            ],
         },
         "sponsor_mapping_methodology": {
             "objective": (
@@ -223,6 +228,8 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "mapping_confidence",
                 "event_date_source_rank",
                 "event_date_precision",
+                "event_date_quality_score",
+                "event_date_quality_tier",
                 "market_record_count",
                 "approval_record_count",
                 "is_model_ready",
@@ -236,7 +243,9 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "missing_fda_context_ratio",
                 "low_confidence_mapping_ratio",
                 "low_completeness_ratio",
+                "low_event_date_quality_ratio",
                 "warning_event_ratio",
+                "average_event_date_quality_score",
             ],
             "model_ready_definition": [
                 "must have canonical nct_id",
@@ -390,6 +399,9 @@ def render_methodology_markdown() -> str:
         "",
         "**Precision policy**",
         bullet_list(event_methodology["precision_policy"]),
+        "",
+        "**Quality scoring**",
+        bullet_list(event_methodology["quality_scoring"]),
         "",
         "## Sponsor Mapping Methodology",
         "",

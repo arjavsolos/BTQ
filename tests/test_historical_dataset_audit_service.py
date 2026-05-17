@@ -19,8 +19,10 @@ class _HistoricalAuditRepoStub:
             "missing_mapping_confidence_events": 1,
             "low_confidence_mapping_events": 2,
             "low_completeness_events": 3,
+            "low_event_date_quality_events": 4,
             "average_data_completeness_ratio": 0.745,
             "average_mapping_confidence": 0.88,
+            "average_event_date_quality_score": 67.4,
             "average_event_day_return": 0.03123,
             "average_post_window_return": 0.05234,
         }
@@ -55,6 +57,13 @@ class _HistoricalAuditRepoStub:
             {"event_date_confidence": "high", "event_count": 6},
             {"event_date_confidence": "moderate", "event_count": 3},
             {"event_date_confidence": "low", "event_count": 1},
+        ]
+
+    def get_event_date_quality_tier_breakdown(self) -> list[dict]:
+        return [
+            {"event_date_quality_tier": "high", "event_count": 5},
+            {"event_date_quality_tier": "moderate", "event_count": 4},
+            {"event_date_quality_tier": "low", "event_count": 1},
         ]
 
     def get_warning_frequency(self, limit: int = 10) -> list[dict]:
@@ -96,10 +105,13 @@ class HistoricalDatasetAuditServiceTests(unittest.TestCase):
         self.assertEqual(report["summary"]["total_events"], 10)
         self.assertEqual(report["summary"]["model_ready_ratio"], 0.6)
         self.assertEqual(report["summary"]["missing_fda_context_ratio"], 0.5)
+        self.assertEqual(report["summary"]["low_event_date_quality_ratio"], 0.4)
+        self.assertEqual(report["summary"]["average_event_date_quality_score"], 67.4)
         self.assertEqual(report["breakdowns"]["phase"][0]["model_ready_ratio"], 0.75)
         self.assertEqual(report["breakdowns"]["therapeutic_area"][1]["model_ready_ratio"], 1.0)
         self.assertEqual(report["breakdowns"]["event_date_source_rank"][0]["event_date_source_rank"], 4)
         self.assertEqual(report["breakdowns"]["event_date_confidence"][0]["event_date_confidence"], "high")
+        self.assertEqual(report["breakdowns"]["event_date_quality_tier"][0]["event_date_quality_tier"], "high")
         self.assertEqual(report["warning_frequency"][0]["warning"], "Low confidence mapping")
         self.assertEqual(report["recent_issues"][0]["nct_id"], "NCT00000001")
 

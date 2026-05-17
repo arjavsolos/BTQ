@@ -164,6 +164,8 @@ Every chosen event-date proxy is stored with:
 - `event_date_source_rank`
 - `event_date_precision`
 - `event_date_confidence`
+- `event_date_quality_score`
+- `event_date_quality_tier`
 
 The source rank makes the fallback logic auditable:
 
@@ -173,6 +175,12 @@ The source rank makes the fallback logic auditable:
 - `last_update_posted` = `1`
 
 If two candidates have the same precision, the higher-ranked source wins.
+
+The scoring layer then turns that proxy into a more usable quality signal:
+
+- `event_date_quality_score` is a `0-100` heuristic score built from precision, source rank, and confidence
+- `event_date_quality_tier` compresses that score into `high`, `moderate`, `low`, or `unknown`
+- quality issues preserve why a chosen date may still be weak even when the row is retained for audit visibility
 
 This is one of the most important methodological safeguards in the entire project because it prevents hidden assumptions about catalyst timing.
 
@@ -209,6 +217,8 @@ At the trial level, the system tracks fields such as:
 - `warning_count`
 - `mapping_confidence`
 - `event_date_source_rank`
+- `event_date_quality_score`
+- `event_date_quality_tier`
 - `approval_record_count`
 - `market_record_count`
 - `event_date_precision`
@@ -224,7 +234,9 @@ At the historical dataset level, the audit layer tracks metrics such as:
 - `missing_fda_context_ratio`
 - `low_confidence_mapping_ratio`
 - `low_completeness_ratio`
+- `low_event_date_quality_ratio`
 - `warning_event_ratio`
+- `average_event_date_quality_score`
 
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 

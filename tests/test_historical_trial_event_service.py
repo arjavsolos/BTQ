@@ -30,6 +30,9 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
                 "event_date_source_rank": 4,
                 "event_date_precision": "day",
                 "event_date_confidence": "high",
+                "event_date_quality_score": 95,
+                "event_date_quality_tier": "high",
+                "event_date_quality_issues": [],
                 "intervention_types": ["DRUG"],
                 "conditions": ["Lung Cancer"],
                 "condition_keywords": ["oncology"],
@@ -74,10 +77,13 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
         self.assertEqual(record["mapped_ticker"], "PFE")
         self.assertEqual(record["event_date_source_rank"], 4)
         self.assertEqual(record["event_date_confidence"], "high")
+        self.assertEqual(record["event_date_quality_score"], 95)
+        self.assertEqual(record["event_date_quality_tier"], "high")
         self.assertEqual(record["approval_record_count"], 1)
         self.assertEqual(record["approval_application_numbers"], ["NDA000001"])
         self.assertTrue(record["is_model_ready"])
         self.assertEqual(record["feature_payload"]["mapping_features"]["match_type"], "exact_normalized")
+        self.assertEqual(record["feature_payload"]["event_date_quality"]["quality_score"], 95)
         self.assertEqual(record["feature_payload"]["model_readiness"]["issues"], [])
 
     def test_build_event_record_tracks_model_readiness_issues(self) -> None:
@@ -90,6 +96,13 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
                 "event_date_source_rank": 1,
                 "event_date_precision": "month",
                 "event_date_confidence": "low",
+                "event_date_quality_score": 38,
+                "event_date_quality_tier": "low",
+                "event_date_quality_issues": [
+                    "non_day_precision_event_date",
+                    "low_rank_event_date_source",
+                    "low_confidence_event_date",
+                ],
             },
             "sponsor_mapping": {
                 "ticker": None,

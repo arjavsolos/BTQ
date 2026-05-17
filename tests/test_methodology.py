@@ -29,6 +29,7 @@ class MethodologyTestCase(unittest.TestCase):
         self.assertIn("**Final product definition:**", markdown)
         self.assertIn("## Final Output Framework", markdown)
         self.assertIn("## Event-Date Methodology", markdown)
+        self.assertIn("**Quality scoring**", markdown)
         self.assertIn("## Sponsor Mapping Methodology", markdown)
         self.assertIn("## Dataset Quality Methodology", markdown)
 

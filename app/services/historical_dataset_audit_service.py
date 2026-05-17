@@ -74,8 +74,13 @@ class HistoricalDatasetAuditService:
                 int(summary.get("low_completeness_events") or 0),
                 total_events,
             ),
+            "low_event_date_quality_ratio": self._safe_ratio(
+                int(summary.get("low_event_date_quality_events") or 0),
+                total_events,
+            ),
             "average_data_completeness_ratio": self._round_nullable(summary.get("average_data_completeness_ratio")),
             "average_mapping_confidence": self._round_nullable(summary.get("average_mapping_confidence")),
+            "average_event_date_quality_score": self._round_nullable(summary.get("average_event_date_quality_score")),
             "average_event_day_return": self._round_nullable(summary.get("average_event_day_return")),
             "average_post_window_return": self._round_nullable(summary.get("average_post_window_return")),
         }
@@ -93,6 +98,7 @@ class HistoricalDatasetAuditService:
                 "event_date_precision": repository.get_event_date_precision_breakdown(),
                 "event_date_source_rank": repository.get_event_date_source_rank_breakdown(),
                 "event_date_confidence": repository.get_event_date_confidence_breakdown(),
+                "event_date_quality_tier": repository.get_event_date_quality_tier_breakdown(),
             },
             "warning_frequency": repository.get_warning_frequency(limit=top_warning_limit),
             "recent_issues": repository.get_recent_issues(limit=issue_limit),
