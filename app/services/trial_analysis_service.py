@@ -85,6 +85,7 @@ class TrialAnalysisService:
             "therapeutic_area": trial.get("therapeutic_area"),
             "event_date_candidate": trial.get("event_date_candidate"),
             "event_date_source": trial.get("event_date_source"),
+            "event_date_source_rank": trial.get("event_date_source_rank"),
             "mapped_ticker": None if sponsor_mapping is None else sponsor_mapping.get("ticker"),
             "mapped_cik": None if sponsor_mapping is None else sponsor_mapping.get("cik"),
             "approval_record_count": len(approval_records),

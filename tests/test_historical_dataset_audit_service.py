@@ -43,6 +43,13 @@ class _HistoricalAuditRepoStub:
             {"event_date_precision": "month", "event_count": 2},
         ]
 
+    def get_event_date_source_rank_breakdown(self) -> list[dict]:
+        return [
+            {"event_date_source_rank": 4, "event_count": 5},
+            {"event_date_source_rank": 2, "event_count": 3},
+            {"event_date_source_rank": 1, "event_count": 2},
+        ]
+
     def get_event_date_confidence_breakdown(self) -> list[dict]:
         return [
             {"event_date_confidence": "high", "event_count": 6},
@@ -91,6 +98,7 @@ class HistoricalDatasetAuditServiceTests(unittest.TestCase):
         self.assertEqual(report["summary"]["missing_fda_context_ratio"], 0.5)
         self.assertEqual(report["breakdowns"]["phase"][0]["model_ready_ratio"], 0.75)
         self.assertEqual(report["breakdowns"]["therapeutic_area"][1]["model_ready_ratio"], 1.0)
+        self.assertEqual(report["breakdowns"]["event_date_source_rank"][0]["event_date_source_rank"], 4)
         self.assertEqual(report["breakdowns"]["event_date_confidence"][0]["event_date_confidence"], "high")
         self.assertEqual(report["warning_frequency"][0]["warning"], "Low confidence mapping")
         self.assertEqual(report["recent_issues"][0]["nct_id"], "NCT00000001")

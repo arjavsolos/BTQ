@@ -76,6 +76,7 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertEqual(record["phase_score"], 3)
         self.assertEqual(record["event_date_candidate"], "2025-01-15")
         self.assertEqual(record["event_date_source"], "primary_completion_date")
+        self.assertEqual(record["event_date_source_rank"], 4)
         self.assertEqual(record["event_date_confidence"], "high")
         self.assertTrue(record["has_primary_outcomes"])
         self.assertTrue(record["has_locations"])
@@ -100,6 +101,7 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
 
         self.assertEqual(record["event_date_candidate"], "2025-02-10")
         self.assertEqual(record["event_date_source"], "results_first_posted")
+        self.assertEqual(record["event_date_source_rank"], 2)
         self.assertEqual(record["event_date_precision"], "day")
         self.assertEqual(record["event_date_confidence"], "moderate")
 
@@ -118,7 +120,28 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
 
         self.assertEqual(record["event_date_candidate"], "2025-03-01")
         self.assertEqual(record["event_date_source"], "last_update_posted")
+        self.assertEqual(record["event_date_source_rank"], 1)
         self.assertEqual(record["event_date_confidence"], "low")
+
+    def test_extract_trial_record_prefers_higher_ranked_source_when_precision_ties(self) -> None:
+        ingestor = ClinicalTrialsIngestor()
+        study = {
+            "protocolSection": {
+                "identificationModule": {"nctId": "NCT00000004"},
+                "statusModule": {
+                    "primaryCompletionDateStruct": {"date": "2025-01-15"},
+                    "completionDateStruct": {"date": "2025-01-22"},
+                    "resultsFirstPostDateStruct": {"date": "2025-01-30"},
+                    "lastUpdatePostDateStruct": {"date": "2025-02-05"},
+                },
+            }
+        }
+
+        record = ingestor.extract_trial_record(study)
+
+        self.assertEqual(record["event_date_candidate"], "2025-01-15")
+        self.assertEqual(record["event_date_source"], "primary_completion_date")
+        self.assertEqual(record["event_date_source_rank"], 4)
 
 
 if __name__ == "__main__":

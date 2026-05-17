@@ -42,6 +42,7 @@ class HistoricalTrialEventService:
                 "has_results": trial.get("has_results"),
                 "data_completeness_score": trial.get("data_completeness_score"),
                 "data_completeness_ratio": trial.get("data_completeness_ratio"),
+                "event_date_source_rank": trial.get("event_date_source_rank"),
                 "event_date_confidence": trial.get("event_date_confidence"),
             },
             "mapping_features": {
@@ -134,6 +135,7 @@ class HistoricalTrialEventService:
             "data_completeness_ratio": trial.get("data_completeness_ratio"),
             "event_date_candidate": trial.get("event_date_candidate"),
             "event_date_source": trial.get("event_date_source"),
+            "event_date_source_rank": trial.get("event_date_source_rank"),
             "event_date_precision": trial.get("event_date_precision"),
             "event_date_confidence": trial.get("event_date_confidence"),
             "mapped_ticker": sponsor_mapping.get("ticker"),

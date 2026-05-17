@@ -54,6 +54,13 @@ KEYWORD_BUCKETS = {
     ],
 }
 
+EVENT_DATE_SOURCE_RANKS = {
+    "last_update_posted": 1,
+    "results_first_posted": 2,
+    "completion_date": 3,
+    "primary_completion_date": 4,
+}
+
 
 @dataclass(slots=True)
 class TrialQuery:
@@ -193,6 +200,11 @@ class ClinicalTrialsIngestor:
             return "low"
         return "unknown"
 
+    def _rank_event_date_source(self, event_date_source: str | None) -> int | None:
+        if not event_date_source:
+            return None
+        return EVENT_DATE_SOURCE_RANKS.get(event_date_source)
+
     def _choose_event_date(
         self,
         status_module: dict[str, Any],
@@ -208,15 +220,20 @@ class ClinicalTrialsIngestor:
             ("last_update_posted", (status_module.get("lastUpdatePostDateStruct") or {}).get("date")),
         ]
         best_candidate: tuple[str | None, str | None] = (None, None)
-        best_rank = -1
+        best_rank = (-1, -1)
         for source, value in candidates:
             if not value:
                 continue
-            current_rank = precision_rank(value)
+            current_rank = (
+                precision_rank(value),
+                self._rank_event_date_source(source) or 0,
+            )
             if current_rank > best_rank:
                 best_candidate = (value, source)
                 best_rank = current_rank
-            if current_rank == 3 and source in {"primary_completion_date", "completion_date"}:
+            if current_rank == (3, EVENT_DATE_SOURCE_RANKS["primary_completion_date"]):
+                return value, source
+            if current_rank == (3, EVENT_DATE_SOURCE_RANKS["completion_date"]):
                 return value, source
         return best_candidate
 
@@ -451,6 +468,7 @@ class ClinicalTrialsIngestor:
             "last_update_posted": (status.get("lastUpdatePostDateStruct") or {}).get("date"),
             "event_date_candidate": event_date_candidate,
             "event_date_source": event_date_source,
+            "event_date_source_rank": self._rank_event_date_source(event_date_source),
             "event_date_precision": self._infer_date_precision(event_date_candidate),
             "event_date_confidence": self._score_event_date_confidence(
                 event_date_candidate,
@@ -583,6 +601,7 @@ class ClinicalTrialsIngestor:
             "enrollment_count": record.get("enrollment_count"),
             "event_date_candidate": record.get("event_date_candidate"),
             "event_date_source": record.get("event_date_source"),
+            "event_date_source_rank": record.get("event_date_source_rank"),
             "has_results": record.get("has_results"),
             "data_completeness_score": record.get("data_completeness_score"),
         }

@@ -124,8 +124,9 @@ def build_methodology_snapshot() -> dict[str, Any]:
         "dataset_methodology": {
             "unit_of_analysis": (
                 "One historical trial-event row represents one analyzed clinical study, "
-                "a chosen event-date candidate, a sponsor-to-ticker mapping outcome, "
-                "regulatory context, and an aligned market reaction window."
+                "a chosen event-date candidate, its source and source rank, a sponsor-to-"
+                "ticker mapping outcome, regulatory context, and an aligned market "
+                "reaction window."
             ),
             "inclusion_criteria": [
                 "Study must have a canonical ClinicalTrials.gov NCT identifier.",
@@ -182,6 +183,7 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "Month precision is preferred over year precision.",
                 "If a lower-ranked field has better precision than a higher-ranked field, the "
                 "higher-precision candidate is preferred.",
+                "If two candidates have the same precision, the higher-ranked source is preferred.",
                 "Market event-window analysis only runs when the chosen event date is day precision.",
             ],
         },
@@ -219,6 +221,7 @@ def build_methodology_snapshot() -> dict[str, Any]:
                 "data_completeness_ratio",
                 "warning_count",
                 "mapping_confidence",
+                "event_date_source_rank",
                 "event_date_precision",
                 "market_record_count",
                 "approval_record_count",

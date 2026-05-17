@@ -120,6 +120,7 @@ TRIAL_COLUMNS = [
     "last_update_posted",
     "event_date_candidate",
     "event_date_source",
+    "event_date_source_rank",
     "event_date_precision",
     "event_date_confidence",
     "locations",
@@ -375,6 +376,7 @@ HISTORICAL_EVENT_COLUMNS = [
     "data_completeness_ratio",
     "event_date_candidate",
     "event_date_source",
+    "event_date_source_rank",
     "event_date_precision",
     "event_date_confidence",
     "mapped_ticker",
@@ -612,6 +614,26 @@ class HistoricalTrialEventRepository:
         return [
             {
                 "event_date_precision": row[0],
+                "event_count": row[1],
+            }
+            for row in rows
+        ]
+
+    def get_event_date_source_rank_breakdown(self) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(event_date_source_rank, 0) as event_date_source_rank,
+            count(*) as event_count
+        from historical_trial_events
+        group by 1
+        order by event_date_source_rank desc, event_count desc;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        return [
+            {
+                "event_date_source_rank": row[0],
                 "event_count": row[1],
             }
             for row in rows

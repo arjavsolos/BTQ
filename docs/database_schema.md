@@ -102,8 +102,7 @@ The `clinical_trials` table is the canonical storage layer for normalized trial 
 - `last_update_posted` `TEXT`
 - `event_date_candidate` `TEXT`
 - `event_date_source` `TEXT`
-- `event_date_precision` `TEXT`
-- `event_date_confidence` `TEXT`
+- `event_date_source_rank` `INTEGER`
 - `event_date_precision` `TEXT`
 - `event_date_confidence` `TEXT`
 
@@ -137,6 +136,7 @@ The `clinical_trials` table is the canonical storage layer for normalized trial 
 - `INDEX clinical_trials_phase_score_idx ON clinical_trials (phase_score)`
 - `INDEX clinical_trials_therapeutic_area_idx ON clinical_trials (therapeutic_area)`
 - `INDEX clinical_trials_event_date_candidate_idx ON clinical_trials (event_date_candidate)`
+- `INDEX clinical_trials_event_date_source_rank_idx ON clinical_trials (event_date_source_rank)`
 - `INDEX clinical_trials_has_results_idx ON clinical_trials (has_results)`
 
 ## Recommended JSONB Index Targets
@@ -186,6 +186,7 @@ Core fields:
 - `ticker`
 - `event_date`
 - `event_date_source`
+- `event_date_source_rank`
 - `event_date_confidence`
 - `pre_event_close`
 - `event_close`
@@ -199,6 +200,7 @@ Core fields:
 - `requested_nct_id` may differ from `nct_id` because alias IDs can resolve to the same study.
 - Date fields are currently stored as strings because ClinicalTrials.gov sometimes returns partial dates like `2008-10`.
 - `event_date_confidence` captures the current heuristic confidence level of the chosen catalyst-date proxy.
+- `event_date_source_rank` makes the source-precedence model queryable and auditable in SQL.
 - Nested arrays and source-rich objects should remain JSONB until there is a proven need to normalize them further.
 
 ## Minimal SQL Shape
@@ -262,6 +264,10 @@ create table clinical_trials (
   results_first_posted text,
   last_update_posted text,
   event_date_candidate text,
+  event_date_source text,
+  event_date_source_rank integer,
+  event_date_precision text,
+  event_date_confidence text,
   locations jsonb,
   location_count integer,
   country_counts jsonb,

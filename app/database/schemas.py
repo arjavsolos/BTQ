@@ -58,6 +58,7 @@ create table if not exists clinical_trials (
   last_update_posted text,
   event_date_candidate text,
   event_date_source text,
+  event_date_source_rank integer,
   event_date_precision text,
   event_date_confidence text,
   locations jsonb,
@@ -97,11 +98,16 @@ CLINICAL_TRIALS_INDEX_SQL = [
     "create index if not exists clinical_trials_phase_score_idx on clinical_trials (phase_score);",
     "create index if not exists clinical_trials_therapeutic_area_idx on clinical_trials (therapeutic_area);",
     "create index if not exists clinical_trials_event_date_candidate_idx on clinical_trials (event_date_candidate);",
+    (
+        "create index if not exists clinical_trials_event_date_source_rank_idx "
+        "on clinical_trials (event_date_source_rank);"
+    ),
     "create index if not exists clinical_trials_has_results_idx on clinical_trials (has_results);",
 ]
 
 
 CLINICAL_TRIALS_MIGRATION_SQL = [
+    "alter table clinical_trials add column if not exists event_date_source_rank integer;",
     "alter table clinical_trials add column if not exists event_date_confidence text;",
 ]
 
@@ -158,6 +164,7 @@ create table if not exists historical_trial_events (
   data_completeness_ratio double precision,
   event_date_candidate text,
   event_date_source text,
+  event_date_source_rank integer,
   event_date_precision text,
   event_date_confidence text,
   mapped_ticker text,
@@ -198,6 +205,10 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
         "on historical_trial_events (event_date_candidate);"
     ),
     (
+        "create index if not exists historical_trial_events_event_date_source_rank_idx "
+        "on historical_trial_events (event_date_source_rank);"
+    ),
+    (
         "create index if not exists historical_trial_events_event_date_confidence_idx "
         "on historical_trial_events (event_date_confidence);"
     ),
@@ -210,6 +221,7 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
 
 
 HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL = [
+    "alter table historical_trial_events add column if not exists event_date_source_rank integer;",
     "alter table historical_trial_events add column if not exists event_date_confidence text;",
 ]
 

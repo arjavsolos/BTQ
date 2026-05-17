@@ -161,8 +161,18 @@ Every chosen event-date proxy is stored with:
 
 - `event_date_candidate`
 - `event_date_source`
+- `event_date_source_rank`
 - `event_date_precision`
 - `event_date_confidence`
+
+The source rank makes the fallback logic auditable:
+
+- `primary_completion_date` = `4`
+- `completion_date` = `3`
+- `results_first_posted` = `2`
+- `last_update_posted` = `1`
+
+If two candidates have the same precision, the higher-ranked source wins.
 
 This is one of the most important methodological safeguards in the entire project because it prevents hidden assumptions about catalyst timing.
 
@@ -198,6 +208,7 @@ At the trial level, the system tracks fields such as:
 - `data_completeness_ratio`
 - `warning_count`
 - `mapping_confidence`
+- `event_date_source_rank`
 - `approval_record_count`
 - `market_record_count`
 - `event_date_precision`
