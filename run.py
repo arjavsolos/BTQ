@@ -65,6 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
     build_dataset.add_argument("--therapeutic-area")
     build_dataset.add_argument("--has-results", action="store_true")
     build_dataset.add_argument("--without-results", action="store_true")
+    build_dataset.add_argument("--min-event-date-quality-score", type=int)
+    build_dataset.add_argument("--event-date-quality-tier")
     build_dataset.add_argument("--include-existing", action="store_true")
 
     audit_dataset = subparsers.add_parser(
@@ -135,6 +137,8 @@ def main() -> None:
             study_type=args.study_type,
             therapeutic_area=args.therapeutic_area,
             has_results=False if args.without_results else (True if args.has_results else None),
+            min_event_date_quality_score=args.min_event_date_quality_score,
+            event_date_quality_tier=args.event_date_quality_tier,
             exclude_existing_historical_events=not args.include_existing,
             batch_size=args.batch_size,
             max_batches=args.max_batches,

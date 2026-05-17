@@ -223,6 +223,8 @@ class ClinicalTrialsRepository:
         study_type: str | None = None,
         therapeutic_area: str | None = None,
         has_results: bool | None = None,
+        min_event_date_quality_score: int | None = None,
+        event_date_quality_tier: str | None = None,
         require_event_date: bool = True,
         exclude_existing_historical_events: bool = False,
     ) -> list[dict[str, Any]]:
@@ -248,6 +250,12 @@ class ClinicalTrialsRepository:
         if has_results is not None:
             clauses.append("clinical_trials.has_results = %s")
             params.append(has_results)
+        if min_event_date_quality_score is not None:
+            clauses.append("clinical_trials.event_date_quality_score >= %s")
+            params.append(max(0, min_event_date_quality_score))
+        if event_date_quality_tier:
+            clauses.append("clinical_trials.event_date_quality_tier = %s")
+            params.append(event_date_quality_tier.strip().lower())
         if require_event_date:
             clauses.append("clinical_trials.event_date_candidate is not null")
         if exclude_existing_historical_events:
@@ -270,7 +278,9 @@ class ClinicalTrialsRepository:
             clinical_trials.study_type,
             clinical_trials.therapeutic_area,
             clinical_trials.has_results,
-            clinical_trials.event_date_candidate
+            clinical_trials.event_date_candidate,
+            clinical_trials.event_date_quality_score,
+            clinical_trials.event_date_quality_tier
         from clinical_trials
         {join_clause}
         {where_clause}
@@ -296,6 +306,8 @@ class ClinicalTrialsRepository:
                 "therapeutic_area": row[5],
                 "has_results": row[6],
                 "event_date_candidate": row[7],
+                "event_date_quality_score": row[8],
+                "event_date_quality_tier": row[9],
             }
             for row in rows
         ]

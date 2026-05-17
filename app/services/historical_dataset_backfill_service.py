@@ -88,6 +88,8 @@ class HistoricalDatasetBackfillService:
         study_type: str | None = None,
         therapeutic_area: str | None = None,
         has_results: bool | None = None,
+        min_event_date_quality_score: int | None = None,
+        event_date_quality_tier: str | None = None,
         exclude_existing_historical_events: bool = True,
         batch_size: int | None = None,
         max_batches: int | None = None,
@@ -103,6 +105,8 @@ class HistoricalDatasetBackfillService:
                 study_type=study_type,
                 therapeutic_area=therapeutic_area,
                 has_results=has_results,
+                min_event_date_quality_score=min_event_date_quality_score,
+                event_date_quality_tier=event_date_quality_tier,
                 require_event_date=True,
                 exclude_existing_historical_events=exclude_existing_historical_events,
             )
@@ -127,6 +131,8 @@ class HistoricalDatasetBackfillService:
                 "study_type": study_type,
                 "therapeutic_area": therapeutic_area,
                 "has_results": has_results,
+                "min_event_date_quality_score": min_event_date_quality_score,
+                "event_date_quality_tier": event_date_quality_tier,
                 "exclude_existing_historical_events": exclude_existing_historical_events,
             },
         }

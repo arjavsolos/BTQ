@@ -70,6 +70,8 @@ def main() -> None:
             study_type=_get_str_env("HISTORICAL_DATASET_STUDY_TYPE"),
             therapeutic_area=_get_str_env("HISTORICAL_DATASET_THERAPEUTIC_AREA"),
             has_results=False if without_results else has_results,
+            min_event_date_quality_score=_get_optional_int_env("HISTORICAL_DATASET_MIN_EVENT_DATE_QUALITY_SCORE"),
+            event_date_quality_tier=_get_str_env("HISTORICAL_DATASET_EVENT_DATE_QUALITY_TIER"),
             exclude_existing_historical_events=not bool(_get_bool_env("HISTORICAL_DATASET_INCLUDE_EXISTING")),
         )
     except Exception as exc:
@@ -91,6 +93,8 @@ def main() -> None:
                         "phase": os.getenv("HISTORICAL_DATASET_PHASE"),
                         "study_type": os.getenv("HISTORICAL_DATASET_STUDY_TYPE"),
                         "therapeutic_area": os.getenv("HISTORICAL_DATASET_THERAPEUTIC_AREA"),
+                        "min_event_date_quality_score": os.getenv("HISTORICAL_DATASET_MIN_EVENT_DATE_QUALITY_SCORE"),
+                        "event_date_quality_tier": os.getenv("HISTORICAL_DATASET_EVENT_DATE_QUALITY_TIER"),
                         "has_results": os.getenv("HISTORICAL_DATASET_HAS_RESULTS"),
                         "without_results": os.getenv("HISTORICAL_DATASET_WITHOUT_RESULTS"),
                         "include_existing": os.getenv("HISTORICAL_DATASET_INCLUDE_EXISTING"),

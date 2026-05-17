@@ -124,6 +124,8 @@ Backfill runs may apply additional filters such as:
 - `sponsor`
 - `therapeutic_area`
 - `has_results`
+- `min_event_date_quality_score`
+- `event_date_quality_tier`
 
 ## Exclusion Criteria
 
