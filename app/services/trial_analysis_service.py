@@ -77,6 +77,7 @@ class TrialAnalysisService:
         market_summary: dict[str, Any] | None,
         approval_records: list[dict[str, Any]],
     ) -> dict[str, Any]:
+        event_date_quality = self._build_event_date_quality_summary(trial)
         return {
             "nct_id": trial.get("nct_id"),
             "requested_nct_id": trial.get("requested_nct_id"),
@@ -90,6 +91,7 @@ class TrialAnalysisService:
             "event_date_source_rank": trial.get("event_date_source_rank"),
             "event_date_quality_score": trial.get("event_date_quality_score"),
             "event_date_quality_tier": trial.get("event_date_quality_tier"),
+            "event_date_quality": event_date_quality,
             "mapped_ticker": None if sponsor_mapping is None else sponsor_mapping.get("ticker"),
             "mapped_cik": None if sponsor_mapping is None else sponsor_mapping.get("cik"),
             "approval_record_count": len(approval_records),
@@ -123,21 +125,39 @@ class TrialAnalysisService:
             warnings.append(f"SEC sponsor mapping failed: {exc}")
             return None, warnings
 
-    def _build_event_date_quality_warnings(self, trial: dict[str, Any]) -> list[str]:
+    def _build_event_date_quality_summary(self, trial: dict[str, Any]) -> dict[str, Any]:
         assessment = self.event_date_quality_service.assess_event_date(
             event_date_value=trial.get("event_date_candidate"),
             event_date_source=trial.get("event_date_source"),
         )
+        return {
+            "candidate": trial.get("event_date_candidate"),
+            "source": trial.get("event_date_source"),
+            "source_rank": trial.get("event_date_source_rank") or assessment.get("event_date_source_rank"),
+            "precision": trial.get("event_date_precision") or assessment.get("event_date_precision"),
+            "confidence": trial.get("event_date_confidence") or assessment.get("event_date_confidence"),
+            "quality_score": trial.get("event_date_quality_score") or assessment.get("event_date_quality_score"),
+            "quality_tier": trial.get("event_date_quality_tier") or assessment.get("event_date_quality_tier"),
+            "quality_issues": list(
+                trial.get("event_date_quality_issues")
+                or assessment.get("event_date_quality_issues")
+                or []
+            ),
+            "is_market_usable": bool(assessment.get("is_market_usable")),
+        }
+
+    def _build_event_date_quality_warnings(self, trial: dict[str, Any]) -> list[str]:
+        assessment = self._build_event_date_quality_summary(trial)
 
         warnings: list[str] = []
         quality_tier = str(
             trial.get("event_date_quality_tier")
-            or assessment.get("event_date_quality_tier")
+            or assessment.get("quality_tier")
             or "unknown"
         )
         quality_issues = list(
             trial.get("event_date_quality_issues")
-            or assessment.get("event_date_quality_issues")
+            or assessment.get("quality_issues")
             or []
         )
 
@@ -288,6 +308,7 @@ class TrialAnalysisService:
                 market_summary=market_summary,
                 approval_records=approval_records,
             ),
+            "event_date_quality": self._build_event_date_quality_summary(trial),
             "trial": trial,
             "sponsor_mapping": sponsor_mapping,
             "fda_context": {

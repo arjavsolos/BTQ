@@ -184,6 +184,7 @@ The scoring layer then turns that proxy into a more usable quality signal:
 - `event_date_quality_tier` compresses that score into `high`, `moderate`, `low`, or `unknown`
 - quality issues preserve why a chosen date may still be weak even when the row is retained for audit visibility
 - trial analysis surfaces explicit warnings when event-date quality is moderate, low, or otherwise incomplete
+- trial analysis also returns a structured event-date-quality summary for downstream reporting and UI use
 
 This is one of the most important methodological safeguards in the entire project because it prevents hidden assumptions about catalyst timing.
 

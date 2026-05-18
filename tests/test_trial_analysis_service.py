@@ -125,6 +125,9 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["summary"]["event_date_source_rank"], 4)
         self.assertEqual(result["summary"]["event_date_quality_score"], 95)
         self.assertEqual(result["summary"]["event_date_quality_tier"], "high")
+        self.assertEqual(result["summary"]["event_date_quality"]["quality_score"], 95)
+        self.assertTrue(result["summary"]["event_date_quality"]["is_market_usable"])
+        self.assertEqual(result["event_date_quality"]["quality_tier"], "high")
         self.assertEqual(result["fda_context"]["approval_record_count"], 1)
         self.assertEqual(result["market_data"]["event_day_return"], 0.123)
         self.assertEqual(result["warnings"], [])
@@ -161,6 +164,9 @@ class TrialAnalysisServiceTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["summary"]["event_date_quality_tier"], "low")
+        self.assertEqual(result["summary"]["event_date_quality"]["quality_tier"], "low")
+        self.assertFalse(result["summary"]["event_date_quality"]["is_market_usable"])
+        self.assertIn("low_confidence_event_date", result["event_date_quality"]["quality_issues"])
         self.assertIsNone(result["market_data"])
         self.assertIn(
             "Event date quality is low, so the selected catalyst date may be a weak "
