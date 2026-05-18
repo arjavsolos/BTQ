@@ -12,7 +12,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.database import get_connection
-from app.database.repositories import SponsorMappingReviewRepository, initialize_database
+from app.database.repositories import (
+    HistoricalTrialEventRepository,
+    SponsorMappingReviewRepository,
+    initialize_database,
+)
 from app.research import build_methodology_snapshot, render_methodology_markdown
 from app.services import (
     HistoricalDatasetAuditService,
@@ -29,6 +33,34 @@ def _build_sponsor_mapping_review_export_summary(reviews: list[dict[str, Any]]) 
     return {
         "exported_review_count": len(reviews),
         "status_counts": status_counts,
+    }
+
+
+def _build_historical_event_export_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
+    quality_tier_counts: dict[str, int] = {}
+    model_ready_count = 0
+    total_quality_score = 0
+    quality_score_count = 0
+
+    for event in events:
+        tier = str(event.get("event_date_quality_tier") or "unknown")
+        quality_tier_counts[tier] = quality_tier_counts.get(tier, 0) + 1
+        if event.get("is_model_ready"):
+            model_ready_count += 1
+        quality_score = event.get("event_date_quality_score")
+        if isinstance(quality_score, int | float):
+            total_quality_score += int(quality_score)
+            quality_score_count += 1
+
+    average_quality_score = None
+    if quality_score_count:
+        average_quality_score = round(total_quality_score / quality_score_count, 2)
+
+    return {
+        "exported_event_count": len(events),
+        "model_ready_count": model_ready_count,
+        "event_date_quality_tier_counts": quality_tier_counts,
+        "average_event_date_quality_score": average_quality_score,
     }
 
 
@@ -94,6 +126,20 @@ def build_parser() -> argparse.ArgumentParser:
     export_sponsor_mapping_reviews.add_argument("--reviewer-email")
     export_sponsor_mapping_reviews.add_argument("--format", choices=["json", "jsonl"], default="json")
     export_sponsor_mapping_reviews.add_argument("--include-summary", action="store_true")
+
+    export_historical_trial_events = subparsers.add_parser(
+        "export-historical-trial-events",
+        help="Export historical trial-event rows in JSON or JSONL format",
+    )
+    export_historical_trial_events.add_argument("--limit", type=int, default=100)
+    export_historical_trial_events.add_argument("--offset", type=int, default=0)
+    export_historical_trial_events.add_argument("--is-model-ready", action="store_true")
+    export_historical_trial_events.add_argument("--mapped-ticker")
+    export_historical_trial_events.add_argument("--phase")
+    export_historical_trial_events.add_argument("--event-date-quality-tier")
+    export_historical_trial_events.add_argument("--min-event-date-quality-score", type=int)
+    export_historical_trial_events.add_argument("--format", choices=["json", "jsonl"], default="json")
+    export_historical_trial_events.add_argument("--include-summary", action="store_true")
     return parser
 
 
@@ -196,6 +242,48 @@ def main() -> None:
         }
         if args.include_summary:
             payload["summary"] = _build_sponsor_mapping_review_export_summary(reviews)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "export-historical-trial-events":
+        is_model_ready_filter = True if args.is_model_ready else None
+
+        with get_connection() as connection:
+            repository = HistoricalTrialEventRepository(connection)
+            repository.create_tables()
+            events = repository.list_events(
+                limit=args.limit,
+                offset=args.offset,
+                is_model_ready=is_model_ready_filter,
+                mapped_ticker=args.mapped_ticker,
+                phase_label=args.phase,
+                event_date_quality_tier=args.event_date_quality_tier,
+                min_event_date_quality_score=args.min_event_date_quality_score,
+            )
+
+        if args.format == "jsonl":
+            for event in events:
+                print(json.dumps(event, ensure_ascii=True))
+            return
+
+        payload = {
+            "status": "success",
+            "generated_at": datetime.now(UTC).isoformat(),
+            "input": {
+                "limit": args.limit,
+                "offset": args.offset,
+                "is_model_ready": is_model_ready_filter,
+                "mapped_ticker": args.mapped_ticker,
+                "phase_label": args.phase,
+                "event_date_quality_tier": args.event_date_quality_tier,
+                "min_event_date_quality_score": args.min_event_date_quality_score,
+                "format": args.format,
+                "include_summary": args.include_summary,
+            },
+            "events": events,
+        }
+        if args.include_summary:
+            payload["summary"] = _build_historical_event_export_summary(events)
         print(json.dumps(payload, indent=2, ensure_ascii=True))
         return
 
