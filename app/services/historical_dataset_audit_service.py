@@ -34,6 +34,54 @@ class HistoricalDatasetAuditService:
             )
         return enriched
 
+    def _find_top_bucket(self, rows: list[dict[str, Any]], key: str) -> dict[str, Any] | None:
+        if not rows:
+            return None
+        ordered = sorted(
+            rows,
+            key=lambda row: (-int(row.get("event_count") or 0), str(row.get(key) or "")),
+        )
+        return ordered[0]
+
+    def _build_event_date_quality_display(
+        self,
+        total_events: int,
+        summary: dict[str, Any],
+        event_date_precision: list[dict[str, Any]],
+        event_date_source_rank: list[dict[str, Any]],
+        event_date_confidence: list[dict[str, Any]],
+        event_date_quality_tier: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        top_precision = self._find_top_bucket(event_date_precision, "event_date_precision")
+        top_source_rank = self._find_top_bucket(event_date_source_rank, "event_date_source_rank")
+        top_confidence = self._find_top_bucket(event_date_confidence, "event_date_confidence")
+        top_quality_tier = self._find_top_bucket(event_date_quality_tier, "event_date_quality_tier")
+        day_precision_count = sum(
+            int(row.get("event_count") or 0)
+            for row in event_date_precision
+            if row.get("event_date_precision") == "day"
+        )
+
+        return {
+            "average_quality_score": self._round_nullable(summary.get("average_event_date_quality_score")),
+            "low_quality_ratio": self._safe_ratio(
+                int(summary.get("low_event_date_quality_events") or 0),
+                total_events,
+            ),
+            "day_precision_ratio": self._safe_ratio(day_precision_count, total_events),
+            "top_precision_bucket": None if top_precision is None else top_precision.get("event_date_precision"),
+            "top_source_rank": None if top_source_rank is None else top_source_rank.get("event_date_source_rank"),
+            "top_confidence_bucket": None if top_confidence is None else top_confidence.get("event_date_confidence"),
+            "top_quality_tier": None if top_quality_tier is None else top_quality_tier.get("event_date_quality_tier"),
+            "display_summary": (
+                f"Average event-date quality score is "
+                f"{self._round_nullable(summary.get('average_event_date_quality_score'))}, "
+                f"with {self._safe_ratio(day_precision_count, total_events)} of rows at day precision "
+                f"and {self._safe_ratio(int(summary.get('low_event_date_quality_events') or 0), total_events)} "
+                f"flagged as low-quality event-date proxies."
+            ),
+        }
+
     def build_report_from_repository(
         self,
         repository: Any,
@@ -44,6 +92,10 @@ class HistoricalDatasetAuditService:
         summary = repository.get_quality_summary()
         total_events = int(summary.get("total_events") or 0)
         model_ready_events = int(summary.get("model_ready_events") or 0)
+        event_date_precision = repository.get_event_date_precision_breakdown()
+        event_date_source_rank = repository.get_event_date_source_rank_breakdown()
+        event_date_confidence = repository.get_event_date_confidence_breakdown()
+        event_date_quality_tier = repository.get_event_date_quality_tier_breakdown()
 
         report_summary = {
             **summary,
@@ -89,16 +141,24 @@ class HistoricalDatasetAuditService:
             "status": "success",
             "dataset": "historical_trial_events",
             "summary": report_summary,
+            "event_date_quality": self._build_event_date_quality_display(
+                total_events=total_events,
+                summary=summary,
+                event_date_precision=event_date_precision,
+                event_date_source_rank=event_date_source_rank,
+                event_date_confidence=event_date_confidence,
+                event_date_quality_tier=event_date_quality_tier,
+            ),
             "breakdowns": {
                 "phase": self._attach_model_ready_ratio(repository.get_phase_breakdown(), "event_count"),
                 "therapeutic_area": self._attach_model_ready_ratio(
                     repository.get_therapeutic_area_breakdown(limit=therapeutic_area_limit),
                     "event_count",
                 ),
-                "event_date_precision": repository.get_event_date_precision_breakdown(),
-                "event_date_source_rank": repository.get_event_date_source_rank_breakdown(),
-                "event_date_confidence": repository.get_event_date_confidence_breakdown(),
-                "event_date_quality_tier": repository.get_event_date_quality_tier_breakdown(),
+                "event_date_precision": event_date_precision,
+                "event_date_source_rank": event_date_source_rank,
+                "event_date_confidence": event_date_confidence,
+                "event_date_quality_tier": event_date_quality_tier,
             },
             "warning_frequency": repository.get_warning_frequency(limit=top_warning_limit),
             "recent_issues": repository.get_recent_issues(limit=issue_limit),

@@ -244,6 +244,8 @@ At the historical dataset level, the audit layer tracks metrics such as:
 - `warning_event_ratio`
 - `average_event_date_quality_score`
 
+Audit outputs should also include a dedicated event-date-quality display section that summarizes the dominant precision, source-rank, confidence, and tier patterns in plain language.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition
