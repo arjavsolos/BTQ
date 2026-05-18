@@ -23,8 +23,24 @@ class _TrialAnalysisServiceStub:
         return {
             "status": "success",
             "summary": {
+                "nct_id": nct_id,
                 "mapped_ticker": f"TICK{nct_id[-1]}",
                 "event_date_candidate": "2025-01-15",
+                "event_date_source": "primary_completion_date",
+                "event_date_source_rank": 4,
+                "event_date_quality_score": 95,
+                "event_date_quality_tier": "high",
+            },
+            "event_date_quality": {
+                "candidate": "2025-01-15",
+                "source": "primary_completion_date",
+                "source_rank": 4,
+                "precision": "day",
+                "confidence": "high",
+                "quality_score": 95,
+                "quality_tier": "high",
+                "quality_issues": [],
+                "is_market_usable": True,
             },
             "warnings": [],
             "persistence": {
@@ -76,6 +92,10 @@ class HistoricalDatasetBackfillServiceTests(unittest.TestCase):
         self.assertEqual(result["successful_analyses"], 2)
         self.assertEqual(result["processed_batches"], 1)
         self.assertEqual(analysis_stub.calls, ["NCT00000001", "NCT00000002"])
+        self.assertEqual(result["results"][0]["event_date_source_rank"], 4)
+        self.assertEqual(result["results"][0]["event_date_quality_score"], 95)
+        self.assertEqual(result["results"][0]["event_date_quality_tier"], "high")
+        self.assertTrue(result["results"][0]["event_date_quality"]["is_market_usable"])
 
     def test_build_from_database_passes_event_date_quality_filters(self) -> None:
         analysis_stub = _TrialAnalysisServiceStub()

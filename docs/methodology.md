@@ -127,6 +127,8 @@ Backfill runs may apply additional filters such as:
 - `min_event_date_quality_score`
 - `event_date_quality_tier`
 
+Backfill outputs should also carry event-date-quality fields on each processed row so the build logs remain useful for QA and cohort inspection.
+
 ## Exclusion Criteria
 
 Trials are excluded from canonical storage or event construction when:

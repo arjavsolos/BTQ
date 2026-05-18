@@ -15,6 +15,26 @@ class HistoricalDatasetBackfillService:
     def __init__(self, trial_analysis_service: TrialAnalysisService | None = None) -> None:
         self.trial_analysis_service = trial_analysis_service or TrialAnalysisService()
 
+    def _build_result_row(self, analysis: dict[str, Any]) -> dict[str, Any]:
+        summary = analysis.get("summary") or {}
+        persistence = analysis.get("persistence") or {}
+        event_date_quality = analysis.get("event_date_quality") or summary.get("event_date_quality") or {}
+
+        return {
+            "nct_id": summary.get("nct_id") or analysis.get("input", {}).get("nct_id"),
+            "status": analysis.get("status"),
+            "analysis_id": persistence.get("analysis_id"),
+            "historical_event_id": persistence.get("historical_event_id"),
+            "mapped_ticker": summary.get("mapped_ticker"),
+            "event_date_candidate": summary.get("event_date_candidate"),
+            "event_date_source": summary.get("event_date_source"),
+            "event_date_source_rank": summary.get("event_date_source_rank"),
+            "event_date_quality_score": summary.get("event_date_quality_score"),
+            "event_date_quality_tier": summary.get("event_date_quality_tier"),
+            "event_date_quality": event_date_quality,
+            "warning_count": len(analysis.get("warnings") or []),
+        }
+
     def build_from_trials(
         self,
         trials: list[dict[str, Any]],
@@ -47,18 +67,7 @@ class HistoricalDatasetBackfillService:
                         include_raw_trial=False,
                         save_to_db=True,
                     )
-                    persistence = analysis.get("persistence") or {}
-                    results.append(
-                        {
-                            "nct_id": nct_id,
-                            "status": analysis.get("status"),
-                            "analysis_id": persistence.get("analysis_id"),
-                            "historical_event_id": persistence.get("historical_event_id"),
-                            "mapped_ticker": (analysis.get("summary") or {}).get("mapped_ticker"),
-                            "event_date_candidate": (analysis.get("summary") or {}).get("event_date_candidate"),
-                            "warning_count": len(analysis.get("warnings") or []),
-                        }
-                    )
+                    results.append(self._build_result_row(analysis))
                     success_count += 1
                 except Exception as exc:
                     results.append({"nct_id": nct_id, "status": "error", "error": str(exc)})
