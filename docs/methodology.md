@@ -248,6 +248,8 @@ At the historical dataset level, the audit layer tracks metrics such as:
 
 Audit outputs should also include a dedicated event-date-quality display section that summarizes the dominant precision, source-rank, confidence, and tier patterns in plain language.
 
+Historical event export should preserve the key event-date-quality and model-readiness fields so stored cohort slices can be inspected outside the database without losing the main QA signals.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition
