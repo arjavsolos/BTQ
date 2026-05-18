@@ -129,6 +129,8 @@ Backfill runs may apply additional filters such as:
 
 Backfill outputs should also carry event-date-quality fields on each processed row so the build logs remain useful for QA and cohort inspection.
 
+Historical event export scripts should preserve those same event-date-quality fields so downstream QA and demo outputs can inspect cohort quality without re-querying raw trial rows.
+
 ## Exclusion Criteria
 
 Trials are excluded from canonical storage or event construction when:

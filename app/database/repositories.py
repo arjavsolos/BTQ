@@ -521,6 +521,95 @@ class HistoricalTrialEventRepository:
             for row in rows
         ]
 
+    def list_events(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        is_model_ready: bool | None = None,
+        mapped_ticker: str | None = None,
+        phase_label: str | None = None,
+        event_date_quality_tier: str | None = None,
+        min_event_date_quality_score: int | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses = []
+        params: list[Any] = []
+
+        if is_model_ready is not None:
+            clauses.append("is_model_ready = %s")
+            params.append(is_model_ready)
+        if mapped_ticker:
+            clauses.append("mapped_ticker = %s")
+            params.append(mapped_ticker.strip().upper())
+        if phase_label:
+            clauses.append("phase_label = %s")
+            params.append(phase_label)
+        if event_date_quality_tier:
+            clauses.append("event_date_quality_tier = %s")
+            params.append(event_date_quality_tier.strip().lower())
+        if min_event_date_quality_score is not None:
+            clauses.append("event_date_quality_score >= %s")
+            params.append(max(0, min_event_date_quality_score))
+
+        where_clause = ""
+        if clauses:
+            where_clause = "where " + " and ".join(clauses)
+
+        sql = f"""
+        select
+            event_id,
+            analysis_id,
+            nct_id,
+            requested_nct_id,
+            sponsor_name,
+            phase_label,
+            mapped_ticker,
+            event_date_candidate,
+            event_date_source,
+            event_date_source_rank,
+            event_date_confidence,
+            event_date_quality_score,
+            event_date_quality_tier,
+            event_day_return,
+            post_window_return,
+            is_model_ready,
+            warning_count,
+            created_at
+        from historical_trial_events
+        {where_clause}
+        order by created_at desc, event_id desc
+        limit %s
+        offset %s;
+        """
+        params.extend([max(1, limit), max(0, offset)])
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "event_id": row[0],
+                "analysis_id": row[1],
+                "nct_id": row[2],
+                "requested_nct_id": row[3],
+                "sponsor_name": row[4],
+                "phase_label": row[5],
+                "mapped_ticker": row[6],
+                "event_date_candidate": row[7],
+                "event_date_source": row[8],
+                "event_date_source_rank": row[9],
+                "event_date_confidence": row[10],
+                "event_date_quality_score": row[11],
+                "event_date_quality_tier": row[12],
+                "event_day_return": row[13],
+                "post_window_return": row[14],
+                "is_model_ready": row[15],
+                "warning_count": row[16],
+                "created_at": str(row[17]),
+            }
+            for row in rows
+        ]
+
     def get_quality_summary(self) -> dict[str, Any]:
         sql = """
         select
