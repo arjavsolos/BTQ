@@ -56,6 +56,10 @@ HISTORICAL_EVENT_JSON_FIELDS = {
     "feature_payload",
 }
 
+EVENT_DATE_REVIEW_JSON_FIELDS = {
+    "event_date_quality_issues",
+}
+
 SPONSOR_MAPPING_REVIEW_JSON_FIELDS = {
     "alternatives",
 }
@@ -446,6 +450,29 @@ SPONSOR_MAPPING_REVIEW_COLUMNS = [
     "reviewed_at",
 ]
 
+EVENT_DATE_REVIEW_COLUMNS = [
+    "nct_id",
+    "requested_nct_id",
+    "sponsor_name",
+    "mapped_ticker",
+    "event_date_candidate",
+    "event_date_source",
+    "event_date_source_rank",
+    "event_date_precision",
+    "event_date_confidence",
+    "event_date_quality_score",
+    "event_date_quality_tier",
+    "event_date_quality_issues",
+    "review_reason",
+    "review_status",
+    "reviewed_event_date",
+    "reviewed_event_date_source",
+    "reviewer_name",
+    "reviewer_email",
+    "review_notes",
+    "reviewed_at",
+]
+
 
 class EventDateReviewRepository:
     def __init__(self, connection: Any) -> None:
@@ -458,6 +485,163 @@ class EventDateReviewRepository:
                 cursor.execute(statement)
             for statement in EVENT_DATE_REVIEWS_INDEX_SQL:
                 cursor.execute(statement)
+
+    def _serialize_review_value(self, column: str, value: Any) -> Any:
+        if column in EVENT_DATE_REVIEW_JSON_FIELDS:
+            return json.dumps(value if value is not None else [])
+        return value
+
+    def _deserialize_review_row(self, row: tuple[Any, ...]) -> dict[str, Any]:
+        return {
+            "review_id": row[0],
+            "nct_id": row[1],
+            "requested_nct_id": row[2],
+            "sponsor_name": row[3],
+            "mapped_ticker": row[4],
+            "event_date_candidate": row[5],
+            "event_date_source": row[6],
+            "event_date_source_rank": row[7],
+            "event_date_precision": row[8],
+            "event_date_confidence": row[9],
+            "event_date_quality_score": row[10],
+            "event_date_quality_tier": row[11],
+            "event_date_quality_issues": [] if row[12] is None else row[12],
+            "review_reason": row[13],
+            "review_status": row[14],
+            "reviewed_event_date": row[15],
+            "reviewed_event_date_source": row[16],
+            "reviewer_name": row[17],
+            "reviewer_email": row[18],
+            "review_notes": row[19],
+            "reviewed_at": None if row[20] is None else str(row[20]),
+            "created_at": None if row[21] is None else str(row[21]),
+            "updated_at": None if row[22] is None else str(row[22]),
+        }
+
+    def upsert_review(self, review_record: dict[str, Any]) -> int:
+        nct_id = (review_record.get("nct_id") or "").strip()
+        if not nct_id:
+            raise ValueError("nct_id is required for event date reviews.")
+
+        placeholders = ", ".join(["%s"] * len(EVENT_DATE_REVIEW_COLUMNS))
+        insert_columns = ", ".join(EVENT_DATE_REVIEW_COLUMNS)
+        update_assignments = ", ".join(
+            f"{column} = excluded.{column}" for column in EVENT_DATE_REVIEW_COLUMNS if column != "nct_id"
+        )
+        values = [
+            self._serialize_review_value(column, review_record.get(column)) for column in EVENT_DATE_REVIEW_COLUMNS
+        ]
+
+        sql = f"""
+        insert into event_date_reviews ({insert_columns})
+        values ({placeholders})
+        on conflict (nct_id) do update
+        set {update_assignments},
+            updated_at = now()
+        returning review_id;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, values)
+            row = cursor.fetchone()
+        return int(row[0])
+
+    def get_review_by_nct_id(self, nct_id: str) -> dict[str, Any] | None:
+        sql = """
+        select
+            review_id,
+            nct_id,
+            requested_nct_id,
+            sponsor_name,
+            mapped_ticker,
+            event_date_candidate,
+            event_date_source,
+            event_date_source_rank,
+            event_date_precision,
+            event_date_confidence,
+            event_date_quality_score,
+            event_date_quality_tier,
+            event_date_quality_issues,
+            review_reason,
+            review_status,
+            reviewed_event_date,
+            reviewed_event_date_source,
+            reviewer_name,
+            reviewer_email,
+            review_notes,
+            reviewed_at,
+            created_at,
+            updated_at
+        from event_date_reviews
+        where nct_id = %s;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (nct_id.strip(),))
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._deserialize_review_row(row)
+
+    def list_reviews(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        review_status: str | None = None,
+        mapped_ticker: str | None = None,
+        event_date_quality_tier: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses = []
+        params: list[Any] = []
+
+        if review_status:
+            clauses.append("review_status = %s")
+            params.append(review_status.strip().lower())
+        if mapped_ticker:
+            clauses.append("mapped_ticker = %s")
+            params.append(mapped_ticker.strip().upper())
+        if event_date_quality_tier:
+            clauses.append("event_date_quality_tier = %s")
+            params.append(event_date_quality_tier.strip().lower())
+
+        where_clause = ""
+        if clauses:
+            where_clause = "where " + " and ".join(clauses)
+
+        sql = f"""
+        select
+            review_id,
+            nct_id,
+            requested_nct_id,
+            sponsor_name,
+            mapped_ticker,
+            event_date_candidate,
+            event_date_source,
+            event_date_source_rank,
+            event_date_precision,
+            event_date_confidence,
+            event_date_quality_score,
+            event_date_quality_tier,
+            event_date_quality_issues,
+            review_reason,
+            review_status,
+            reviewed_event_date,
+            reviewed_event_date_source,
+            reviewer_name,
+            reviewer_email,
+            review_notes,
+            reviewed_at,
+            created_at,
+            updated_at
+        from event_date_reviews
+        {where_clause}
+        order by updated_at desc, review_id desc
+        limit %s
+        offset %s;
+        """
+        params.extend([max(1, limit), max(0, offset)])
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+        return [self._deserialize_review_row(row) for row in rows]
 
 
 class HistoricalTrialEventRepository:
