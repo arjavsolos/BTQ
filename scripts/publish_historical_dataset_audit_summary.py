@@ -23,6 +23,7 @@ def main() -> None:
         ]
     else:
         summary = payload.get("summary") or {}
+        event_date_quality = payload.get("event_date_quality") or {}
         warning_frequency = payload.get("warning_frequency") or []
         recent_issues = payload.get("recent_issues") or []
         summary_lines = [
@@ -38,7 +39,24 @@ def main() -> None:
             f"- Missing market-data ratio: `{summary.get('missing_market_data_ratio', 'unknown')}`",
             f"- Low-confidence mapping ratio: `{summary.get('low_confidence_mapping_ratio', 'unknown')}`",
             f"- Low-completeness ratio: `{summary.get('low_completeness_ratio', 'unknown')}`",
+            f"- Low event-date quality ratio: `{summary.get('low_event_date_quality_ratio', 'unknown')}`",
+            f"- Average event-date quality score: `{summary.get('average_event_date_quality_score', 'unknown')}`",
         ]
+
+        if event_date_quality:
+            summary_lines.extend(
+                [
+                    "",
+                    "### Event-Date Quality",
+                    "",
+                    f"- Average quality score: `{event_date_quality.get('average_quality_score', 'unknown')}`",
+                    f"- Low-quality ratio: `{event_date_quality.get('low_quality_ratio', 'unknown')}`",
+                    f"- Day-precision ratio: `{event_date_quality.get('day_precision_ratio', 'unknown')}`",
+                    f"- Top source rank: `{event_date_quality.get('top_source_rank', 'unknown')}`",
+                    f"- Top confidence bucket: `{event_date_quality.get('top_confidence_bucket', 'unknown')}`",
+                    f"- Top quality tier: `{event_date_quality.get('top_quality_tier', 'unknown')}`",
+                ]
+            )
 
         if warning_frequency:
             summary_lines.extend(["", "### Top Warnings", ""])

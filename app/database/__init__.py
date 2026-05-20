@@ -7,6 +7,7 @@ from app.database.connection import (
 )
 from app.database.repositories import (
     ClinicalTrialsRepository,
+    EventDateReviewRepository,
     SponsorMappingReviewRepository,
     TrialAnalysisRepository,
     initialize_database,
@@ -14,6 +15,7 @@ from app.database.repositories import (
 
 __all__ = [
     "ClinicalTrialsRepository",
+    "EventDateReviewRepository",
     "SponsorMappingReviewRepository",
     "TrialAnalysisRepository",
     "DatabaseConfigError",

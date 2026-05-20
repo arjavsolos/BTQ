@@ -200,6 +200,30 @@ Core fields:
 - `post_3d_return`
 - `volume_change`
 
+### `event_date_reviews`
+
+Purpose:
+- stores event-date candidates that need human review before they are treated as fully trusted catalyst proxies
+
+Core fields:
+- `nct_id`
+- `mapped_ticker`
+- `event_date_candidate`
+- `event_date_source`
+- `event_date_source_rank`
+- `event_date_precision`
+- `event_date_confidence`
+- `event_date_quality_score`
+- `event_date_quality_tier`
+- `event_date_quality_issues`
+- `review_reason`
+- `review_status`
+- `reviewed_event_date`
+- `reviewed_event_date_source`
+- `reviewer_name`
+- `reviewer_email`
+- `review_notes`
+
 ## Data Contract Notes
 
 - `nct_id` is canonical and should be unique.
@@ -208,6 +232,7 @@ Core fields:
 - `event_date_confidence` captures the current heuristic confidence level of the chosen catalyst-date proxy.
 - `event_date_source_rank` makes the source-precedence model queryable and auditable in SQL.
 - `event_date_quality_score` and `event_date_quality_tier` make event-date quality usable in downstream cohorts, audits, and models.
+- `event_date_reviews` is the schema foundation for later human review of weak or ambiguous catalyst-date proxies.
 - Nested arrays and source-rich objects should remain JSONB until there is a proven need to normalize them further.
 
 ## Minimal SQL Shape

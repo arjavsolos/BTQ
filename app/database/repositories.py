@@ -6,6 +6,9 @@ from app.database.schemas import (
     CLINICAL_TRIALS_INDEX_SQL,
     CLINICAL_TRIALS_MIGRATION_SQL,
     CLINICAL_TRIALS_TABLE_SQL,
+    EVENT_DATE_REVIEWS_INDEX_SQL,
+    EVENT_DATE_REVIEWS_MIGRATION_SQL,
+    EVENT_DATE_REVIEWS_TABLE_SQL,
     HISTORICAL_TRIAL_EVENTS_INDEX_SQL,
     HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL,
     HISTORICAL_TRIAL_EVENTS_TABLE_SQL,
@@ -442,6 +445,19 @@ SPONSOR_MAPPING_REVIEW_COLUMNS = [
     "review_notes",
     "reviewed_at",
 ]
+
+
+class EventDateReviewRepository:
+    def __init__(self, connection: Any) -> None:
+        self.connection = connection
+
+    def create_tables(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(EVENT_DATE_REVIEWS_TABLE_SQL)
+            for statement in EVENT_DATE_REVIEWS_MIGRATION_SQL:
+                cursor.execute(statement)
+            for statement in EVENT_DATE_REVIEWS_INDEX_SQL:
+                cursor.execute(statement)
 
 
 class HistoricalTrialEventRepository:
@@ -1036,9 +1052,11 @@ def initialize_database() -> None:
     with get_connection() as connection:
         trial_repository = ClinicalTrialsRepository(connection)
         analysis_repository = TrialAnalysisRepository(connection)
+        event_date_review_repository = EventDateReviewRepository(connection)
         historical_repository = HistoricalTrialEventRepository(connection)
         sponsor_mapping_review_repository = SponsorMappingReviewRepository(connection)
         trial_repository.create_tables()
         analysis_repository.create_tables()
+        event_date_review_repository.create_tables()
         historical_repository.create_tables()
         sponsor_mapping_review_repository.create_tables()

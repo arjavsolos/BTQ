@@ -244,6 +244,64 @@ HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL = [
 ]
 
 
+EVENT_DATE_REVIEWS_TABLE_SQL = """
+create table if not exists event_date_reviews (
+  review_id bigserial primary key,
+  nct_id text not null references clinical_trials (nct_id) on delete cascade,
+  requested_nct_id text,
+  sponsor_name text,
+  mapped_ticker text,
+  event_date_candidate text,
+  event_date_source text,
+  event_date_source_rank integer,
+  event_date_precision text,
+  event_date_confidence text,
+  event_date_quality_score integer,
+  event_date_quality_tier text,
+  event_date_quality_issues jsonb not null default '[]'::jsonb,
+  review_reason text,
+  review_status text not null default 'pending',
+  reviewed_event_date text,
+  reviewed_event_date_source text,
+  reviewer_name text,
+  reviewer_email text,
+  review_notes text,
+  reviewed_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (nct_id)
+);
+"""
+
+
+EVENT_DATE_REVIEWS_INDEX_SQL = [
+    "create index if not exists event_date_reviews_review_status_idx on event_date_reviews (review_status);",
+    "create index if not exists event_date_reviews_mapped_ticker_idx on event_date_reviews (mapped_ticker);",
+    (
+        "create index if not exists event_date_reviews_event_date_quality_tier_idx "
+        "on event_date_reviews (event_date_quality_tier);"
+    ),
+    (
+        "create index if not exists event_date_reviews_event_date_quality_score_idx "
+        "on event_date_reviews (event_date_quality_score);"
+    ),
+    "create index if not exists event_date_reviews_created_at_idx on event_date_reviews (created_at desc);",
+]
+
+
+EVENT_DATE_REVIEWS_MIGRATION_SQL = [
+    "alter table event_date_reviews add column if not exists event_date_source_rank integer;",
+    "alter table event_date_reviews add column if not exists event_date_confidence text;",
+    "alter table event_date_reviews add column if not exists event_date_quality_score integer;",
+    "alter table event_date_reviews add column if not exists event_date_quality_tier text;",
+    (
+        "alter table event_date_reviews add column if not exists "
+        "event_date_quality_issues jsonb not null default '[]'::jsonb;"
+    ),
+    "alter table event_date_reviews add column if not exists review_reason text;",
+]
+
+
 SPONSOR_MAPPING_REVIEWS_TABLE_SQL = """
 create table if not exists sponsor_mapping_reviews (
   review_id bigserial primary key,
