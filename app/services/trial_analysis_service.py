@@ -26,6 +26,7 @@ from app.ingestion import (
     SecCompanyMapper,
 )
 from app.services.event_date_quality_service import EventDateQualityService
+from app.services.event_date_review_service import EventDateReviewService
 from app.services.historical_trial_event_service import HistoricalTrialEventService
 from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
@@ -46,6 +47,7 @@ class TrialAnalysisService:
         openfda_ingestor: OpenFDAIngestor | None = None,
         market_data_ingestor: MarketDataIngestor | None = None,
         sponsor_mapping_review_service: SponsorMappingReviewService | None = None,
+        event_date_review_service: EventDateReviewService | None = None,
         persist_trial_records: bool = True,
     ) -> None:
         self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
@@ -55,6 +57,7 @@ class TrialAnalysisService:
         self.sponsor_mapping_review_service = sponsor_mapping_review_service or SponsorMappingReviewService(
             sec_mapper=self.sec_mapper
         )
+        self.event_date_review_service = event_date_review_service or EventDateReviewService()
         self.persist_trial_records = persist_trial_records
         self.event_date_quality_service = EventDateQualityService()
         self.historical_event_service = HistoricalTrialEventService()
@@ -185,6 +188,30 @@ class TrialAnalysisService:
             warnings.append("Event date precision could not be classified confidently from the source metadata.")
         return warnings
 
+    def _queue_event_date_review(
+        self,
+        trial: dict[str, Any],
+        sponsor_mapping: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        review_trial = dict(trial)
+        if sponsor_mapping and sponsor_mapping.get("ticker"):
+            review_trial["mapped_ticker"] = sponsor_mapping.get("ticker")
+
+        try:
+            queue_result = self.event_date_review_service.queue_review(review_trial)
+        except Exception as exc:
+            return None, [f"Event-date review queue failed: {exc}"]
+
+        if not queue_result.get("queued"):
+            return queue_result, []
+
+        review_record = queue_result.get("review_record") or {}
+        review_reason = review_record.get("review_reason") or queue_result.get("reason")
+        return queue_result, [
+            "Event date was queued for manual review because the catalyst-date proxy looks weak or ambiguous."
+            f" review_reason={review_reason}"
+        ]
+
     def _fetch_market_summary(
         self,
         ticker: str | None,
@@ -273,6 +300,8 @@ class TrialAnalysisService:
         warnings.extend(self._build_event_date_quality_warnings(trial))
         sponsor_mapping, sponsor_warnings = self._normalize_sponsor_mapping(trial.get("sponsor_name"))
         warnings.extend(sponsor_warnings)
+        event_date_review, event_date_review_warnings = self._queue_event_date_review(trial, sponsor_mapping)
+        warnings.extend(event_date_review_warnings)
 
         approval_records, fda_warnings = self._fetch_fda_context(
             sponsor_name=trial.get("sponsor_name"),
@@ -309,6 +338,7 @@ class TrialAnalysisService:
                 approval_records=approval_records,
             ),
             "event_date_quality": self._build_event_date_quality_summary(trial),
+            "event_date_review": event_date_review,
             "trial": trial,
             "sponsor_mapping": sponsor_mapping,
             "fda_context": {
