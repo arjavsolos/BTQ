@@ -24,3 +24,9 @@ That review queue is now grounded by the `event_date_reviews` table, which is in
 - a later human-reviewed event-date override if needed
 
 This makes event-date quality control auditable in the same spirit as sponsor-mapping review.
+
+The current operational export path for queued event-date reviews is:
+
+- `python scripts/export_event_date_reviews.py`
+
+That export layer is intended for QA, manual review, and later workflow/report integration.
