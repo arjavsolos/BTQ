@@ -412,6 +412,9 @@ HISTORICAL_EVENT_COLUMNS = [
     "matched_company_name",
     "mapping_confidence",
     "mapping_match_type",
+    "sponsor_mapping_review_status",
+    "sponsor_mapping_reviewed_mapping_status",
+    "sponsor_mapping_override_applied",
     "approval_record_count",
     "approval_application_numbers",
     "approval_brand_names",
@@ -772,6 +775,8 @@ class HistoricalTrialEventRepository:
             event_date_confidence,
             event_date_quality_score,
             event_date_quality_tier,
+            sponsor_mapping_review_status,
+            sponsor_mapping_override_applied,
             event_date_review_status,
             event_date_review_reason,
             event_date_override_applied,
@@ -807,14 +812,16 @@ class HistoricalTrialEventRepository:
                 "event_date_confidence": row[10],
                 "event_date_quality_score": row[11],
                 "event_date_quality_tier": row[12],
-                "event_date_review_status": row[13],
-                "event_date_review_reason": row[14],
-                "event_date_override_applied": row[15],
-                "event_day_return": row[16],
-                "post_window_return": row[17],
-                "is_model_ready": row[18],
-                "warning_count": row[19],
-                "created_at": str(row[20]),
+                "sponsor_mapping_review_status": row[13],
+                "sponsor_mapping_override_applied": row[14],
+                "event_date_review_status": row[15],
+                "event_date_review_reason": row[16],
+                "event_date_override_applied": row[17],
+                "event_day_return": row[18],
+                "post_window_return": row[19],
+                "is_model_ready": row[20],
+                "warning_count": row[21],
+                "created_at": str(row[22]),
             }
             for row in rows
         ]
@@ -846,11 +853,26 @@ class HistoricalTrialEventRepository:
             count(*) filter (
                 where event_date_quality_score is null or event_date_quality_score < 55
             ) as low_event_date_quality_events,
+            count(*) filter (
+                where sponsor_mapping_review_status is not null
+                and btrim(sponsor_mapping_review_status) <> ''
+            ) as sponsor_mapping_reviewed_events,
+            count(*) filter (where sponsor_mapping_override_applied) as sponsor_mapping_override_events,
             count(*) filter (where event_date_override_applied) as event_date_override_events,
             count(*) filter (
                 where event_date_review_status is not null
                 and btrim(event_date_review_status) <> ''
             ) as event_date_reviewed_events,
+            count(*) filter (
+                where sponsor_mapping_review_status is not null
+                and btrim(sponsor_mapping_review_status) <> ''
+                and event_date_review_status is not null
+                and btrim(event_date_review_status) <> ''
+            ) as overlapping_review_events,
+            count(*) filter (
+                where sponsor_mapping_override_applied
+                and event_date_override_applied
+            ) as overlapping_override_events,
             avg(data_completeness_ratio) as average_data_completeness_ratio,
             avg(mapping_confidence) as average_mapping_confidence,
             avg(event_date_quality_score) as average_event_date_quality_score,
@@ -874,13 +896,17 @@ class HistoricalTrialEventRepository:
             "low_confidence_mapping_events": row[9],
             "low_completeness_events": row[10],
             "low_event_date_quality_events": row[11],
-            "event_date_override_events": row[12],
-            "event_date_reviewed_events": row[13],
-            "average_data_completeness_ratio": row[14],
-            "average_mapping_confidence": row[15],
-            "average_event_date_quality_score": row[16],
-            "average_event_day_return": row[17],
-            "average_post_window_return": row[18],
+            "sponsor_mapping_reviewed_events": row[12],
+            "sponsor_mapping_override_events": row[13],
+            "event_date_override_events": row[14],
+            "event_date_reviewed_events": row[15],
+            "overlapping_review_events": row[16],
+            "overlapping_override_events": row[17],
+            "average_data_completeness_ratio": row[18],
+            "average_mapping_confidence": row[19],
+            "average_event_date_quality_score": row[20],
+            "average_event_day_return": row[21],
+            "average_post_window_return": row[22],
         }
 
     def get_phase_breakdown(self) -> list[dict[str, Any]]:
@@ -1023,6 +1049,26 @@ class HistoricalTrialEventRepository:
         return [
             {
                 "event_date_review_status": row[0],
+                "event_count": row[1],
+            }
+            for row in rows
+        ]
+
+    def get_sponsor_mapping_review_status_breakdown(self) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(nullif(sponsor_mapping_review_status, ''), 'UNKNOWN') as sponsor_mapping_review_status,
+            count(*) as event_count
+        from historical_trial_events
+        group by 1
+        order by event_count desc, sponsor_mapping_review_status asc;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        return [
+            {
+                "sponsor_mapping_review_status": row[0],
                 "event_count": row[1],
             }
             for row in rows

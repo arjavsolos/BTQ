@@ -20,8 +20,12 @@ class _HistoricalAuditRepoStub:
             "low_confidence_mapping_events": 2,
             "low_completeness_events": 3,
             "low_event_date_quality_events": 4,
+            "sponsor_mapping_reviewed_events": 4,
+            "sponsor_mapping_override_events": 2,
             "event_date_override_events": 2,
             "event_date_reviewed_events": 3,
+            "overlapping_review_events": 2,
+            "overlapping_override_events": 1,
             "average_data_completeness_ratio": 0.745,
             "average_mapping_confidence": 0.88,
             "average_event_date_quality_score": 67.4,
@@ -74,6 +78,12 @@ class _HistoricalAuditRepoStub:
             {"event_date_review_status": "approved", "event_count": 3},
         ]
 
+    def get_sponsor_mapping_review_status_breakdown(self) -> list[dict]:
+        return [
+            {"sponsor_mapping_review_status": "UNKNOWN", "event_count": 6},
+            {"sponsor_mapping_review_status": "approved", "event_count": 4},
+        ]
+
     def get_warning_frequency(self, limit: int = 10) -> list[dict]:
         return [
             {"warning": "Low confidence mapping", "warning_count": 2},
@@ -114,8 +124,12 @@ class HistoricalDatasetAuditServiceTests(unittest.TestCase):
         self.assertEqual(report["summary"]["model_ready_ratio"], 0.6)
         self.assertEqual(report["summary"]["missing_fda_context_ratio"], 0.5)
         self.assertEqual(report["summary"]["low_event_date_quality_ratio"], 0.4)
+        self.assertEqual(report["summary"]["sponsor_mapping_reviewed_ratio"], 0.4)
+        self.assertEqual(report["summary"]["sponsor_mapping_override_ratio"], 0.2)
         self.assertEqual(report["summary"]["event_date_reviewed_ratio"], 0.3)
         self.assertEqual(report["summary"]["event_date_override_ratio"], 0.2)
+        self.assertEqual(report["summary"]["overlapping_review_ratio"], 0.2)
+        self.assertEqual(report["summary"]["overlapping_override_ratio"], 0.1)
         self.assertEqual(report["summary"]["average_event_date_quality_score"], 67.4)
         self.assertEqual(report["event_date_quality"]["average_quality_score"], 67.4)
         self.assertEqual(report["event_date_quality"]["low_quality_ratio"], 0.4)
@@ -128,12 +142,23 @@ class HistoricalDatasetAuditServiceTests(unittest.TestCase):
         self.assertEqual(report["event_date_quality"]["reviewed_ratio"], 0.3)
         self.assertEqual(report["event_date_quality"]["override_applied_ratio"], 0.2)
         self.assertIn("Average event-date quality score is 67.4", report["event_date_quality"]["display_summary"])
+        self.assertEqual(report["review_overlap"]["sponsor_mapping_reviewed_ratio"], 0.4)
+        self.assertEqual(report["review_overlap"]["event_date_reviewed_ratio"], 0.3)
+        self.assertEqual(report["review_overlap"]["overlapping_review_ratio"], 0.2)
+        self.assertEqual(report["review_overlap"]["overlapping_override_ratio"], 0.1)
+        self.assertEqual(report["review_overlap"]["top_sponsor_mapping_review_status"], "UNKNOWN")
+        self.assertEqual(report["review_overlap"]["top_event_date_review_status"], "UNKNOWN")
+        self.assertIn("and 0.2 carry both.", report["review_overlap"]["display_summary"])
         self.assertEqual(report["breakdowns"]["phase"][0]["model_ready_ratio"], 0.75)
         self.assertEqual(report["breakdowns"]["therapeutic_area"][1]["model_ready_ratio"], 1.0)
         self.assertEqual(report["breakdowns"]["event_date_source_rank"][0]["event_date_source_rank"], 4)
         self.assertEqual(report["breakdowns"]["event_date_confidence"][0]["event_date_confidence"], "high")
         self.assertEqual(report["breakdowns"]["event_date_quality_tier"][0]["event_date_quality_tier"], "high")
         self.assertEqual(report["breakdowns"]["event_date_review_status"][0]["event_date_review_status"], "UNKNOWN")
+        self.assertEqual(
+            report["breakdowns"]["sponsor_mapping_review_status"][0]["sponsor_mapping_review_status"],
+            "UNKNOWN",
+        )
         self.assertEqual(report["warning_frequency"][0]["warning"], "Low confidence mapping")
         self.assertEqual(report["recent_issues"][0]["nct_id"], "NCT00000001")
 

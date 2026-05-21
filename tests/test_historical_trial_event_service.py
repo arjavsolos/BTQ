@@ -44,7 +44,10 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
                 "cik": "0000078003",
                 "matched_company_name": "PFIZER INC",
                 "confidence": 1.0,
-                "match_type": "exact_normalized",
+                "match_type": "reviewed_approved_override",
+                "review_status": "approved",
+                "reviewed_mapping_status": "approved_override",
+                "mapping_source": "sponsor_mapping_review",
             },
             "fda_context": {
                 "approval_records": [
@@ -94,10 +97,15 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
         self.assertEqual(record["event_date_review_status"], "approved")
         self.assertEqual(record["event_date_review_reason"], "low_event_date_quality_score")
         self.assertTrue(record["event_date_override_applied"])
+        self.assertEqual(record["sponsor_mapping_review_status"], "approved")
+        self.assertEqual(record["sponsor_mapping_reviewed_mapping_status"], "approved_override")
+        self.assertTrue(record["sponsor_mapping_override_applied"])
         self.assertEqual(record["approval_record_count"], 1)
         self.assertEqual(record["approval_application_numbers"], ["NDA000001"])
         self.assertTrue(record["is_model_ready"])
-        self.assertEqual(record["feature_payload"]["mapping_features"]["match_type"], "exact_normalized")
+        self.assertEqual(record["feature_payload"]["mapping_features"]["match_type"], "reviewed_approved_override")
+        self.assertEqual(record["feature_payload"]["mapping_features"]["review_status"], "approved")
+        self.assertTrue(record["feature_payload"]["mapping_features"]["override_applied"])
         self.assertEqual(record["feature_payload"]["event_date_quality"]["quality_score"], 95)
         self.assertEqual(record["feature_payload"]["event_date_review"]["review_status"], "approved")
         self.assertTrue(record["feature_payload"]["event_date_review"]["override_applied"])

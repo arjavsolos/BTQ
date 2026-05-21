@@ -187,6 +187,9 @@ create table if not exists historical_trial_events (
   matched_company_name text,
   mapping_confidence double precision,
   mapping_match_type text,
+  sponsor_mapping_review_status text,
+  sponsor_mapping_reviewed_mapping_status text,
+  sponsor_mapping_override_applied boolean not null default false,
   approval_record_count integer not null default 0,
   approval_application_numbers jsonb,
   approval_brand_names jsonb,
@@ -236,6 +239,10 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
         "on historical_trial_events (event_date_review_status);"
     ),
     (
+        "create index if not exists historical_trial_events_sponsor_mapping_review_status_idx "
+        "on historical_trial_events (sponsor_mapping_review_status);"
+    ),
+    (
         "create index if not exists historical_trial_events_model_ready_idx "
         "on historical_trial_events (is_model_ready);"
     ),
@@ -253,6 +260,15 @@ HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL = [
     (
         "alter table historical_trial_events add column if not exists "
         "event_date_override_applied boolean not null default false;"
+    ),
+    "alter table historical_trial_events add column if not exists sponsor_mapping_review_status text;",
+    (
+        "alter table historical_trial_events add column if not exists "
+        "sponsor_mapping_reviewed_mapping_status text;"
+    ),
+    (
+        "alter table historical_trial_events add column if not exists "
+        "sponsor_mapping_override_applied boolean not null default false;"
     ),
 ]
 

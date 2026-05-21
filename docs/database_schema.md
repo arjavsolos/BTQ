@@ -242,6 +242,12 @@ Core fields:
 - `event_date_review_reason`
 - `event_date_override_applied`
 
+It also preserves sponsor-mapping review provenance through:
+
+- `sponsor_mapping_review_status`
+- `sponsor_mapping_reviewed_mapping_status`
+- `sponsor_mapping_override_applied`
+
 This makes it possible to distinguish raw machine-selected catalyst dates from reviewed timing overrides in the persisted research dataset.
 - Nested arrays and source-rich objects should remain JSONB until there is a proven need to normalize them further.
 

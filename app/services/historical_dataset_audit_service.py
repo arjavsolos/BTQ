@@ -96,6 +96,66 @@ class HistoricalDatasetAuditService:
             ),
         }
 
+    def _build_review_overlap_display(
+        self,
+        total_events: int,
+        summary: dict[str, Any],
+        sponsor_mapping_review_status: list[dict[str, Any]],
+        event_date_review_status: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        top_sponsor_review_status = self._find_top_bucket(
+            sponsor_mapping_review_status,
+            "sponsor_mapping_review_status",
+        )
+        top_event_date_review_status = self._find_top_bucket(
+            event_date_review_status,
+            "event_date_review_status",
+        )
+        return {
+            "sponsor_mapping_reviewed_ratio": self._safe_ratio(
+                int(summary.get("sponsor_mapping_reviewed_events") or 0),
+                total_events,
+            ),
+            "sponsor_mapping_override_ratio": self._safe_ratio(
+                int(summary.get("sponsor_mapping_override_events") or 0),
+                total_events,
+            ),
+            "event_date_reviewed_ratio": self._safe_ratio(
+                int(summary.get("event_date_reviewed_events") or 0),
+                total_events,
+            ),
+            "event_date_override_ratio": self._safe_ratio(
+                int(summary.get("event_date_override_events") or 0),
+                total_events,
+            ),
+            "overlapping_review_ratio": self._safe_ratio(
+                int(summary.get("overlapping_review_events") or 0),
+                total_events,
+            ),
+            "overlapping_override_ratio": self._safe_ratio(
+                int(summary.get("overlapping_override_events") or 0),
+                total_events,
+            ),
+            "top_sponsor_mapping_review_status": (
+                None
+                if top_sponsor_review_status is None
+                else top_sponsor_review_status.get("sponsor_mapping_review_status")
+            ),
+            "top_event_date_review_status": (
+                None
+                if top_event_date_review_status is None
+                else top_event_date_review_status.get("event_date_review_status")
+            ),
+            "display_summary": (
+                f"{self._safe_ratio(int(summary.get('sponsor_mapping_reviewed_events') or 0), total_events)} "
+                f"of rows carry sponsor-mapping review provenance, "
+                f"{self._safe_ratio(int(summary.get('event_date_reviewed_events') or 0), total_events)} "
+                f"carry event-date review provenance, and "
+                f"{self._safe_ratio(int(summary.get('overlapping_review_events') or 0), total_events)} "
+                f"carry both."
+            ),
+        }
+
     def build_report_from_repository(
         self,
         repository: Any,
@@ -111,6 +171,7 @@ class HistoricalDatasetAuditService:
         event_date_confidence = repository.get_event_date_confidence_breakdown()
         event_date_quality_tier = repository.get_event_date_quality_tier_breakdown()
         event_date_review_status = repository.get_event_date_review_status_breakdown()
+        sponsor_mapping_review_status = repository.get_sponsor_mapping_review_status_breakdown()
 
         report_summary = {
             **summary,
@@ -145,12 +206,28 @@ class HistoricalDatasetAuditService:
                 int(summary.get("low_event_date_quality_events") or 0),
                 total_events,
             ),
+            "sponsor_mapping_reviewed_ratio": self._safe_ratio(
+                int(summary.get("sponsor_mapping_reviewed_events") or 0),
+                total_events,
+            ),
+            "sponsor_mapping_override_ratio": self._safe_ratio(
+                int(summary.get("sponsor_mapping_override_events") or 0),
+                total_events,
+            ),
             "event_date_reviewed_ratio": self._safe_ratio(
                 int(summary.get("event_date_reviewed_events") or 0),
                 total_events,
             ),
             "event_date_override_ratio": self._safe_ratio(
                 int(summary.get("event_date_override_events") or 0),
+                total_events,
+            ),
+            "overlapping_review_ratio": self._safe_ratio(
+                int(summary.get("overlapping_review_events") or 0),
+                total_events,
+            ),
+            "overlapping_override_ratio": self._safe_ratio(
+                int(summary.get("overlapping_override_events") or 0),
                 total_events,
             ),
             "average_data_completeness_ratio": self._round_nullable(summary.get("average_data_completeness_ratio")),
@@ -173,6 +250,12 @@ class HistoricalDatasetAuditService:
                 event_date_quality_tier=event_date_quality_tier,
                 event_date_review_status=event_date_review_status,
             ),
+            "review_overlap": self._build_review_overlap_display(
+                total_events=total_events,
+                summary=summary,
+                sponsor_mapping_review_status=sponsor_mapping_review_status,
+                event_date_review_status=event_date_review_status,
+            ),
             "breakdowns": {
                 "phase": self._attach_model_ready_ratio(repository.get_phase_breakdown(), "event_count"),
                 "therapeutic_area": self._attach_model_ready_ratio(
@@ -184,6 +267,7 @@ class HistoricalDatasetAuditService:
                 "event_date_confidence": event_date_confidence,
                 "event_date_quality_tier": event_date_quality_tier,
                 "event_date_review_status": event_date_review_status,
+                "sponsor_mapping_review_status": sponsor_mapping_review_status,
             },
             "warning_frequency": repository.get_warning_frequency(limit=top_warning_limit),
             "recent_issues": repository.get_recent_issues(limit=issue_limit),
