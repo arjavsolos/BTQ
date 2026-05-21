@@ -109,14 +109,20 @@ class _SponsorReviewStub:
 
 
 class _EventDateReviewStub:
-    def __init__(self, queue_result: dict | None = None) -> None:
+    def __init__(self, queue_result: dict | None = None, override_result: dict | None = None) -> None:
         self.queue_result = queue_result or {
             "queued": False,
             "reason": "event_date_does_not_require_review",
             "review_id": None,
             "review_record": None,
         }
+        self.override_result = override_result or {
+            "trial_record": None,
+            "review_record": None,
+            "override_applied": False,
+        }
         self.calls: list[dict] = []
+        self.override_calls: list[dict] = []
 
     def queue_review(self, trial_record: dict[str, object], review_reason: str | None = None, force: bool = False):
         self.calls.append(
@@ -127,6 +133,16 @@ class _EventDateReviewStub:
             }
         )
         return self.queue_result
+
+    def apply_review_override(self, trial_record: dict[str, object]) -> dict:
+        self.override_calls.append({"trial_record": dict(trial_record)})
+        if self.override_result.get("trial_record") is None:
+            return {
+                "trial_record": trial_record,
+                "review_record": self.override_result.get("review_record"),
+                "override_applied": self.override_result.get("override_applied", False),
+            }
+        return self.override_result
 
 
 class TrialAnalysisServiceTests(unittest.TestCase):
@@ -172,6 +188,66 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["market_data"]["ticker"], "MRK")
         self.assertIn(
             "Sponsor mapping used a reviewed override instead of the raw SEC match.",
+            result["warnings"],
+        )
+
+    def test_analyze_trial_uses_approved_event_date_review_override_when_available(self) -> None:
+        event_date_review_stub = _EventDateReviewStub(
+            queue_result={
+                "queued": False,
+                "reason": "approved_review_exists",
+                "review_id": 301,
+                "review_record": {
+                    "review_id": 301,
+                    "review_status": "approved",
+                    "reviewed_event_date": "2025-01-12",
+                    "reviewed_event_date_source": "company_press_release",
+                },
+                "override_applied": False,
+            },
+            override_result={
+                "trial_record": {
+                    "nct_id": "NCT00000001",
+                    "brief_title": "Example Trial",
+                    "sponsor_name": "Pfizer Inc",
+                    "phase_label": "PHASE3",
+                    "overall_status": "COMPLETED",
+                    "therapeutic_area": "Oncology",
+                    "event_date_candidate": "2025-01-12",
+                    "event_date_source": "company_press_release",
+                    "event_date_source_rank": None,
+                    "event_date_quality_score": None,
+                    "event_date_quality_tier": None,
+                    "event_date_quality_issues": [],
+                },
+                "review_record": {
+                    "review_id": 301,
+                    "review_status": "approved",
+                    "reviewed_event_date": "2025-01-12",
+                    "reviewed_event_date_source": "company_press_release",
+                },
+                "override_applied": True,
+            },
+        )
+        service = TrialAnalysisService(
+            clinical_trials_ingestor=_ClinicalStub(),
+            sec_mapper=_SecStub(),
+            openfda_ingestor=_OpenFDAStub(),
+            market_data_ingestor=_MarketStub(),
+            sponsor_mapping_review_service=_SponsorReviewStub(),
+            event_date_review_service=event_date_review_stub,
+        )
+
+        result = service.analyze_trial("NCT00000001")
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["summary"]["event_date_candidate"], "2025-01-12")
+        self.assertEqual(result["summary"]["event_date_source"], "company_press_release")
+        self.assertEqual(result["market_data"]["event_date"], "2025-01-12")
+        self.assertFalse(result["event_date_review"]["queued"])
+        self.assertEqual(result["event_date_review"]["reason"], "approved_review_exists")
+        self.assertIn(
+            "Event date used an approved reviewed override instead of the original stored proxy.",
             result["warnings"],
         )
 

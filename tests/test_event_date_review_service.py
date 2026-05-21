@@ -264,6 +264,40 @@ class EventDateReviewServiceTests(unittest.TestCase):
             "[2026-05-19T12:00:00+00:00 | status=pending] existing note",
         )
 
+    def test_apply_review_override_prefers_approved_reviewed_event_date(self) -> None:
+        service = EventDateReviewService()
+        repository = _RepositoryStub()
+        repository.reviews_by_nct_id["NCT00000001"] = {
+            "review_id": 301,
+            "nct_id": "NCT00000001",
+            "review_status": "approved",
+            "reviewed_event_date": "2025-01-12",
+            "reviewed_event_date_source": "company_press_release",
+        }
+
+        with (
+            patch(
+                "app.services.event_date_review_service.get_connection",
+                return_value=_ConnectionStub(),
+            ),
+            patch(
+                "app.services.event_date_review_service.EventDateReviewRepository",
+                return_value=repository,
+            ),
+        ):
+            result = service.apply_review_override(
+                {
+                    "nct_id": "NCT00000001",
+                    "event_date_candidate": "2025-01-15",
+                    "event_date_source": "primary_completion_date",
+                    "event_date_quality_score": 95,
+                }
+            )
+
+        self.assertTrue(result["override_applied"])
+        self.assertEqual(result["trial_record"]["event_date_candidate"], "2025-01-12")
+        self.assertEqual(result["trial_record"]["event_date_source"], "company_press_release")
+
 
 if __name__ == "__main__":
     unittest.main()

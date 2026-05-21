@@ -188,11 +188,47 @@ class TrialAnalysisService:
             warnings.append("Event date precision could not be classified confidently from the source metadata.")
         return warnings
 
+    def _apply_event_date_review_override(
+        self,
+        trial: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any] | None, list[str]]:
+        try:
+            resolution = self.event_date_review_service.apply_review_override(trial)
+        except Exception as exc:
+            return trial, None, [f"Event-date review override lookup failed: {exc}"]
+
+        review_record = resolution.get("review_record")
+        resolved_trial = dict(resolution.get("trial_record") or trial)
+        warnings: list[str] = []
+
+        if resolution.get("override_applied"):
+            assessment = self.event_date_quality_service.assess_event_date(
+                event_date_value=resolved_trial.get("event_date_candidate"),
+                event_date_source=resolved_trial.get("event_date_source"),
+            )
+            resolved_trial.update(assessment)
+            warnings.append("Event date used an approved reviewed override instead of the original stored proxy.")
+
+        return resolved_trial, review_record, warnings
+
     def _queue_event_date_review(
         self,
         trial: dict[str, Any],
         sponsor_mapping: dict[str, Any] | None,
+        existing_review_record: dict[str, Any] | None = None,
     ) -> tuple[dict[str, Any] | None, list[str]]:
+        if existing_review_record and (existing_review_record.get("review_status") or "").strip().lower() == "approved":
+            return (
+                {
+                    "queued": False,
+                    "reason": "approved_review_exists",
+                    "review_id": existing_review_record.get("review_id"),
+                    "review_record": existing_review_record,
+                    "override_applied": False,
+                },
+                [],
+            )
+
         review_trial = dict(trial)
         if sponsor_mapping and sponsor_mapping.get("ticker"):
             review_trial["mapped_ticker"] = sponsor_mapping.get("ticker")
@@ -297,10 +333,18 @@ class TrialAnalysisService:
         warnings: list[str] = []
 
         trial = self.clinical_trials_ingestor.fetch_trial_data(nct_id, include_raw=include_raw_trial)
+        trial, existing_event_date_review_record, event_date_override_warnings = self._apply_event_date_review_override(
+            trial
+        )
+        warnings.extend(event_date_override_warnings)
         warnings.extend(self._build_event_date_quality_warnings(trial))
         sponsor_mapping, sponsor_warnings = self._normalize_sponsor_mapping(trial.get("sponsor_name"))
         warnings.extend(sponsor_warnings)
-        event_date_review, event_date_review_warnings = self._queue_event_date_review(trial, sponsor_mapping)
+        event_date_review, event_date_review_warnings = self._queue_event_date_review(
+            trial,
+            sponsor_mapping,
+            existing_review_record=existing_event_date_review_record,
+        )
         warnings.extend(event_date_review_warnings)
 
         approval_records, fda_warnings = self._fetch_fda_context(

@@ -62,6 +62,35 @@ class EventDateReviewService:
             return clean_existing_review_notes
         return f"{clean_existing_review_notes}\n{note_entry}"
 
+    def _build_effective_trial_from_review(
+        self,
+        trial_record: dict[str, Any],
+        review_record: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if review_record is None:
+            return None
+        if (review_record.get("review_status") or "").strip().lower() != "approved":
+            return None
+
+        reviewed_event_date = (review_record.get("reviewed_event_date") or "").strip()
+        if not reviewed_event_date:
+            return None
+
+        effective_trial = dict(trial_record)
+        effective_trial["event_date_candidate"] = reviewed_event_date
+        reviewed_event_date_source = (review_record.get("reviewed_event_date_source") or "").strip() or None
+        if reviewed_event_date_source:
+            effective_trial["event_date_source"] = reviewed_event_date_source
+
+        # Force downstream quality logic to reassess the final reviewed timing choice.
+        effective_trial["event_date_source_rank"] = None
+        effective_trial["event_date_precision"] = None
+        effective_trial["event_date_confidence"] = None
+        effective_trial["event_date_quality_score"] = None
+        effective_trial["event_date_quality_tier"] = None
+        effective_trial["event_date_quality_issues"] = []
+        return effective_trial
+
     def _derive_review_reason(self, trial_record: dict[str, Any]) -> str:
         event_date_candidate = (trial_record.get("event_date_candidate") or "").strip()
         event_date_precision = (trial_record.get("event_date_precision") or "").strip().lower()
@@ -234,4 +263,43 @@ class EventDateReviewService:
             "reason": "review_record_upserted",
             "review_id": review_id,
             "review_record": review_record,
+        }
+
+    def apply_review_override(self, trial_record: dict[str, Any] | None) -> dict[str, Any]:
+        if not trial_record:
+            return {
+                "trial_record": trial_record,
+                "review_record": None,
+                "override_applied": False,
+            }
+
+        nct_id = " ".join(str(trial_record.get("nct_id") or "").split()).strip()
+        if not nct_id:
+            return {
+                "trial_record": trial_record,
+                "review_record": None,
+                "override_applied": False,
+            }
+
+        with get_connection() as connection:
+            repository = EventDateReviewRepository(connection)
+            repository.create_tables()
+            review_record = repository.get_review_by_nct_id(nct_id)
+
+        effective_trial = self._build_effective_trial_from_review(trial_record, review_record)
+        if effective_trial is None:
+            return {
+                "trial_record": trial_record,
+                "review_record": review_record,
+                "override_applied": False,
+            }
+
+        override_applied = (
+            effective_trial.get("event_date_candidate") != trial_record.get("event_date_candidate")
+            or effective_trial.get("event_date_source") != trial_record.get("event_date_source")
+        )
+        return {
+            "trial_record": effective_trial,
+            "review_record": review_record,
+            "override_applied": override_applied,
         }
