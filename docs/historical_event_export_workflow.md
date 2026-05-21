@@ -116,6 +116,8 @@ When summary mode is enabled, the export layer also computes a lightweight QA su
 - exported event count
 - model-ready event count
 - event-date-quality-tier counts
+- event-date-review-status counts
+- approved timing-override count
 - average event-date-quality score
 
 That makes the export more useful for operational review and dataset snapshots.
@@ -139,6 +141,9 @@ Important fields include:
 - `event_date_confidence`
 - `event_date_quality_score`
 - `event_date_quality_tier`
+- `event_date_review_status`
+- `event_date_review_reason`
+- `event_date_override_applied`
 - `event_day_return`
 - `post_window_return`
 - `is_model_ready`
@@ -167,6 +172,7 @@ They also say:
 - how strong that event-date proxy looks
 - where it came from
 - whether it should be trusted for cleaner historical benchmarking
+- whether the stored event date came from an approved reviewed override
 
 This is one of the biggest reasons the export workflow matters for BTQ. It keeps the uncertainty visible instead of hiding it.
 

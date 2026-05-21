@@ -60,6 +60,8 @@ class ExportHistoricalTrialEventsScriptTests(unittest.TestCase):
                     "mapped_ticker": "PFE",
                     "event_date_quality_score": 92,
                     "event_date_quality_tier": "high",
+                    "event_date_review_status": "approved",
+                    "event_date_override_applied": True,
                     "is_model_ready": True,
                 },
                 {
@@ -67,6 +69,8 @@ class ExportHistoricalTrialEventsScriptTests(unittest.TestCase):
                     "mapped_ticker": "MRK",
                     "event_date_quality_score": 66,
                     "event_date_quality_tier": "moderate",
+                    "event_date_review_status": "unknown",
+                    "event_date_override_applied": False,
                     "is_model_ready": False,
                 },
             ]
@@ -106,6 +110,8 @@ class ExportHistoricalTrialEventsScriptTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["exported_event_count"], 2)
         self.assertEqual(payload["summary"]["model_ready_count"], 1)
         self.assertEqual(payload["summary"]["event_date_quality_tier_counts"]["high"], 1)
+        self.assertEqual(payload["summary"]["event_date_review_status_counts"]["approved"], 1)
+        self.assertEqual(payload["summary"]["event_date_override_applied_count"], 1)
         self.assertEqual(payload["summary"]["average_event_date_quality_score"], 79.0)
         self.assertTrue(repository.created)
         self.assertEqual(

@@ -61,15 +61,21 @@ def _get_format_env(name: str, default: str = "json") -> str:
 
 def _build_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
     quality_tier_counts: dict[str, int] = {}
+    review_status_counts: dict[str, int] = {}
     model_ready_count = 0
+    override_applied_count = 0
     total_quality_score = 0
     quality_score_count = 0
 
     for event in events:
         tier = str(event.get("event_date_quality_tier") or "unknown")
         quality_tier_counts[tier] = quality_tier_counts.get(tier, 0) + 1
+        review_status = str(event.get("event_date_review_status") or "unknown")
+        review_status_counts[review_status] = review_status_counts.get(review_status, 0) + 1
         if event.get("is_model_ready"):
             model_ready_count += 1
+        if event.get("event_date_override_applied"):
+            override_applied_count += 1
         quality_score = event.get("event_date_quality_score")
         if isinstance(quality_score, int | float):
             total_quality_score += int(quality_score)
@@ -83,6 +89,8 @@ def _build_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
         "exported_event_count": len(events),
         "model_ready_count": model_ready_count,
         "event_date_quality_tier_counts": quality_tier_counts,
+        "event_date_review_status_counts": review_status_counts,
+        "event_date_override_applied_count": override_applied_count,
         "average_event_date_quality_score": average_quality_score,
     }
 

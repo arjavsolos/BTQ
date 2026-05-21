@@ -51,11 +51,13 @@ class HistoricalDatasetAuditService:
         event_date_source_rank: list[dict[str, Any]],
         event_date_confidence: list[dict[str, Any]],
         event_date_quality_tier: list[dict[str, Any]],
+        event_date_review_status: list[dict[str, Any]],
     ) -> dict[str, Any]:
         top_precision = self._find_top_bucket(event_date_precision, "event_date_precision")
         top_source_rank = self._find_top_bucket(event_date_source_rank, "event_date_source_rank")
         top_confidence = self._find_top_bucket(event_date_confidence, "event_date_confidence")
         top_quality_tier = self._find_top_bucket(event_date_quality_tier, "event_date_quality_tier")
+        top_review_status = self._find_top_bucket(event_date_review_status, "event_date_review_status")
         day_precision_count = sum(
             int(row.get("event_count") or 0)
             for row in event_date_precision
@@ -73,12 +75,24 @@ class HistoricalDatasetAuditService:
             "top_source_rank": None if top_source_rank is None else top_source_rank.get("event_date_source_rank"),
             "top_confidence_bucket": None if top_confidence is None else top_confidence.get("event_date_confidence"),
             "top_quality_tier": None if top_quality_tier is None else top_quality_tier.get("event_date_quality_tier"),
+            "top_review_status": (
+                None
+                if top_review_status is None
+                else top_review_status.get("event_date_review_status")
+            ),
+            "reviewed_ratio": self._safe_ratio(int(summary.get("event_date_reviewed_events") or 0), total_events),
+            "override_applied_ratio": self._safe_ratio(
+                int(summary.get("event_date_override_events") or 0),
+                total_events,
+            ),
             "display_summary": (
                 f"Average event-date quality score is "
                 f"{self._round_nullable(summary.get('average_event_date_quality_score'))}, "
                 f"with {self._safe_ratio(day_precision_count, total_events)} of rows at day precision "
                 f"and {self._safe_ratio(int(summary.get('low_event_date_quality_events') or 0), total_events)} "
-                f"flagged as low-quality event-date proxies."
+                f"flagged as low-quality event-date proxies. "
+                f"{self._safe_ratio(int(summary.get('event_date_override_events') or 0), total_events)} "
+                f"used approved reviewed timing overrides."
             ),
         }
 
@@ -96,6 +110,7 @@ class HistoricalDatasetAuditService:
         event_date_source_rank = repository.get_event_date_source_rank_breakdown()
         event_date_confidence = repository.get_event_date_confidence_breakdown()
         event_date_quality_tier = repository.get_event_date_quality_tier_breakdown()
+        event_date_review_status = repository.get_event_date_review_status_breakdown()
 
         report_summary = {
             **summary,
@@ -130,6 +145,14 @@ class HistoricalDatasetAuditService:
                 int(summary.get("low_event_date_quality_events") or 0),
                 total_events,
             ),
+            "event_date_reviewed_ratio": self._safe_ratio(
+                int(summary.get("event_date_reviewed_events") or 0),
+                total_events,
+            ),
+            "event_date_override_ratio": self._safe_ratio(
+                int(summary.get("event_date_override_events") or 0),
+                total_events,
+            ),
             "average_data_completeness_ratio": self._round_nullable(summary.get("average_data_completeness_ratio")),
             "average_mapping_confidence": self._round_nullable(summary.get("average_mapping_confidence")),
             "average_event_date_quality_score": self._round_nullable(summary.get("average_event_date_quality_score")),
@@ -148,6 +171,7 @@ class HistoricalDatasetAuditService:
                 event_date_source_rank=event_date_source_rank,
                 event_date_confidence=event_date_confidence,
                 event_date_quality_tier=event_date_quality_tier,
+                event_date_review_status=event_date_review_status,
             ),
             "breakdowns": {
                 "phase": self._attach_model_ready_ratio(repository.get_phase_breakdown(), "event_count"),
@@ -159,6 +183,7 @@ class HistoricalDatasetAuditService:
                 "event_date_source_rank": event_date_source_rank,
                 "event_date_confidence": event_date_confidence,
                 "event_date_quality_tier": event_date_quality_tier,
+                "event_date_review_status": event_date_review_status,
             },
             "warning_frequency": repository.get_warning_frequency(limit=top_warning_limit),
             "recent_issues": repository.get_recent_issues(limit=issue_limit),

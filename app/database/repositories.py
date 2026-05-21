@@ -846,6 +846,11 @@ class HistoricalTrialEventRepository:
             count(*) filter (
                 where event_date_quality_score is null or event_date_quality_score < 55
             ) as low_event_date_quality_events,
+            count(*) filter (where event_date_override_applied) as event_date_override_events,
+            count(*) filter (
+                where event_date_review_status is not null
+                and btrim(event_date_review_status) <> ''
+            ) as event_date_reviewed_events,
             avg(data_completeness_ratio) as average_data_completeness_ratio,
             avg(mapping_confidence) as average_mapping_confidence,
             avg(event_date_quality_score) as average_event_date_quality_score,
@@ -869,11 +874,13 @@ class HistoricalTrialEventRepository:
             "low_confidence_mapping_events": row[9],
             "low_completeness_events": row[10],
             "low_event_date_quality_events": row[11],
-            "average_data_completeness_ratio": row[12],
-            "average_mapping_confidence": row[13],
-            "average_event_date_quality_score": row[14],
-            "average_event_day_return": row[15],
-            "average_post_window_return": row[16],
+            "event_date_override_events": row[12],
+            "event_date_reviewed_events": row[13],
+            "average_data_completeness_ratio": row[14],
+            "average_mapping_confidence": row[15],
+            "average_event_date_quality_score": row[16],
+            "average_event_day_return": row[17],
+            "average_post_window_return": row[18],
         }
 
     def get_phase_breakdown(self) -> list[dict[str, Any]]:
@@ -996,6 +1003,26 @@ class HistoricalTrialEventRepository:
         return [
             {
                 "event_date_quality_tier": row[0],
+                "event_count": row[1],
+            }
+            for row in rows
+        ]
+
+    def get_event_date_review_status_breakdown(self) -> list[dict[str, Any]]:
+        sql = """
+        select
+            coalesce(nullif(event_date_review_status, ''), 'UNKNOWN') as event_date_review_status,
+            count(*) as event_count
+        from historical_trial_events
+        group by 1
+        order by event_count desc, event_date_review_status asc;
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        return [
+            {
+                "event_date_review_status": row[0],
                 "event_count": row[1],
             }
             for row in rows
