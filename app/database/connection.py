@@ -170,7 +170,6 @@ def create_connection(autocommit: bool = False) -> Any:
         )
     else:
         connection = driver.connect(settings.database_url, **_build_connect_kwargs(settings))
-
     if driver_name == "psycopg":
         connection.autocommit = autocommit
     elif driver_name == "psycopg2":

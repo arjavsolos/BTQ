@@ -43,6 +43,35 @@ class _HistoricalEventRepositoryStub:
         return list(self.events)
 
 
+class _EventDateReviewRepositoryStub:
+    def __init__(self, reviews: list[dict]) -> None:
+        self.reviews = reviews
+        self.created = False
+        self.list_reviews_calls: list[dict] = []
+
+    def create_tables(self) -> None:
+        self.created = True
+
+    def list_reviews(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        review_status: str | None = None,
+        mapped_ticker: str | None = None,
+        event_date_quality_tier: str | None = None,
+    ) -> list[dict]:
+        self.list_reviews_calls.append(
+            {
+                "limit": limit,
+                "offset": offset,
+                "review_status": review_status,
+                "mapped_ticker": mapped_ticker,
+                "event_date_quality_tier": event_date_quality_tier,
+            }
+        )
+        return list(self.reviews)
+
+
 class _ConnectionStub:
     def __enter__(self) -> _ConnectionStub:
         return self
@@ -139,6 +168,37 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(args.format, "jsonl")
         self.assertTrue(args.include_summary)
 
+    def test_build_parser_supports_event_date_review_export_command(self) -> None:
+        parser = run.build_parser()
+
+        args = parser.parse_args(
+            [
+                "export-event-date-reviews",
+                "--limit",
+                "25",
+                "--offset",
+                "5",
+                "--review-status",
+                "pending",
+                "--mapped-ticker",
+                "PFE",
+                "--event-date-quality-tier",
+                "low",
+                "--format",
+                "jsonl",
+                "--include-summary",
+            ]
+        )
+
+        self.assertEqual(args.command, "export-event-date-reviews")
+        self.assertEqual(args.limit, 25)
+        self.assertEqual(args.offset, 5)
+        self.assertEqual(args.review_status, "pending")
+        self.assertEqual(args.mapped_ticker, "PFE")
+        self.assertEqual(args.event_date_quality_tier, "low")
+        self.assertEqual(args.format, "jsonl")
+        self.assertTrue(args.include_summary)
+
     def test_main_exports_historical_events_with_summary(self) -> None:
         repository = _HistoricalEventRepositoryStub(
             [
@@ -203,6 +263,68 @@ class RunParserTests(unittest.TestCase):
                 "phase_label": "PHASE 3",
                 "event_date_quality_tier": "high",
                 "min_event_date_quality_score": 80,
+            },
+        )
+
+    def test_main_exports_event_date_reviews_with_summary(self) -> None:
+        repository = _EventDateReviewRepositoryStub(
+            [
+                {
+                    "review_id": 1,
+                    "review_status": "pending",
+                    "event_date_quality_tier": "low",
+                    "mapped_ticker": "PFE",
+                },
+                {
+                    "review_id": 2,
+                    "review_status": "approved",
+                    "event_date_quality_tier": "moderate",
+                    "mapped_ticker": "MRK",
+                },
+            ]
+        )
+        stdout = io.StringIO()
+
+        with (
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "run.py",
+                    "export-event-date-reviews",
+                    "--limit",
+                    "25",
+                    "--offset",
+                    "5",
+                    "--review-status",
+                    "pending",
+                    "--mapped-ticker",
+                    "PFE",
+                    "--event-date-quality-tier",
+                    "low",
+                    "--include-summary",
+                ],
+            ),
+            patch("run.get_connection", return_value=_ConnectionStub()),
+            patch("run.EventDateReviewRepository", return_value=repository),
+            redirect_stdout(stdout),
+        ):
+            run.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["summary"]["exported_review_count"], 2)
+        self.assertEqual(payload["summary"]["status_counts"]["pending"], 1)
+        self.assertEqual(payload["summary"]["event_date_quality_tier_counts"]["low"], 1)
+        self.assertTrue(repository.created)
+        self.assertEqual(
+            repository.list_reviews_calls[0],
+            {
+                "limit": 25,
+                "offset": 5,
+                "review_status": "pending",
+                "mapped_ticker": "PFE",
+                "event_date_quality_tier": "low",
             },
         )
 

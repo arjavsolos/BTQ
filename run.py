@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.database import get_connection
 from app.database.repositories import (
+    EventDateReviewRepository,
     HistoricalTrialEventRepository,
     SponsorMappingReviewRepository,
     initialize_database,
@@ -61,6 +62,24 @@ def _build_historical_event_export_summary(events: list[dict[str, Any]]) -> dict
         "model_ready_count": model_ready_count,
         "event_date_quality_tier_counts": quality_tier_counts,
         "average_event_date_quality_score": average_quality_score,
+    }
+
+
+def _build_event_date_review_export_summary(reviews: list[dict[str, Any]]) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    quality_tier_counts: dict[str, int] = {}
+
+    for review in reviews:
+        review_status = str(review.get("review_status") or "unknown")
+        status_counts[review_status] = status_counts.get(review_status, 0) + 1
+
+        quality_tier = str(review.get("event_date_quality_tier") or "unknown")
+        quality_tier_counts[quality_tier] = quality_tier_counts.get(quality_tier, 0) + 1
+
+    return {
+        "exported_review_count": len(reviews),
+        "status_counts": status_counts,
+        "event_date_quality_tier_counts": quality_tier_counts,
     }
 
 
@@ -140,6 +159,18 @@ def build_parser() -> argparse.ArgumentParser:
     export_historical_trial_events.add_argument("--min-event-date-quality-score", type=int)
     export_historical_trial_events.add_argument("--format", choices=["json", "jsonl"], default="json")
     export_historical_trial_events.add_argument("--include-summary", action="store_true")
+
+    export_event_date_reviews = subparsers.add_parser(
+        "export-event-date-reviews",
+        help="Export event-date review rows in JSON or JSONL format",
+    )
+    export_event_date_reviews.add_argument("--limit", type=int, default=100)
+    export_event_date_reviews.add_argument("--offset", type=int, default=0)
+    export_event_date_reviews.add_argument("--review-status")
+    export_event_date_reviews.add_argument("--mapped-ticker")
+    export_event_date_reviews.add_argument("--event-date-quality-tier")
+    export_event_date_reviews.add_argument("--format", choices=["json", "jsonl"], default="json")
+    export_event_date_reviews.add_argument("--include-summary", action="store_true")
     return parser
 
 
@@ -284,6 +315,42 @@ def main() -> None:
         }
         if args.include_summary:
             payload["summary"] = _build_historical_event_export_summary(events)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "export-event-date-reviews":
+        with get_connection() as connection:
+            repository = EventDateReviewRepository(connection)
+            repository.create_tables()
+            reviews = repository.list_reviews(
+                limit=args.limit,
+                offset=args.offset,
+                review_status=args.review_status,
+                mapped_ticker=args.mapped_ticker,
+                event_date_quality_tier=args.event_date_quality_tier,
+            )
+
+        if args.format == "jsonl":
+            for review in reviews:
+                print(json.dumps(review, ensure_ascii=True))
+            return
+
+        payload = {
+            "status": "success",
+            "generated_at": datetime.now(UTC).isoformat(),
+            "input": {
+                "limit": args.limit,
+                "offset": args.offset,
+                "review_status": args.review_status,
+                "mapped_ticker": args.mapped_ticker,
+                "event_date_quality_tier": args.event_date_quality_tier,
+                "format": args.format,
+                "include_summary": args.include_summary,
+            },
+            "reviews": reviews,
+        }
+        if args.include_summary:
+            payload["summary"] = _build_event_date_review_export_summary(reviews)
         print(json.dumps(payload, indent=2, ensure_ascii=True))
         return
 
