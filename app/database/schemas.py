@@ -179,6 +179,9 @@ create table if not exists historical_trial_events (
   event_date_confidence text,
   event_date_quality_score integer,
   event_date_quality_tier text,
+  event_date_review_status text,
+  event_date_review_reason text,
+  event_date_override_applied boolean not null default false,
   mapped_ticker text,
   mapped_cik text,
   matched_company_name text,
@@ -229,6 +232,10 @@ HISTORICAL_TRIAL_EVENTS_INDEX_SQL = [
         "on historical_trial_events (event_date_quality_score);"
     ),
     (
+        "create index if not exists historical_trial_events_event_date_review_status_idx "
+        "on historical_trial_events (event_date_review_status);"
+    ),
+    (
         "create index if not exists historical_trial_events_model_ready_idx "
         "on historical_trial_events (is_model_ready);"
     ),
@@ -241,6 +248,12 @@ HISTORICAL_TRIAL_EVENTS_MIGRATION_SQL = [
     "alter table historical_trial_events add column if not exists event_date_confidence text;",
     "alter table historical_trial_events add column if not exists event_date_quality_score integer;",
     "alter table historical_trial_events add column if not exists event_date_quality_tier text;",
+    "alter table historical_trial_events add column if not exists event_date_review_status text;",
+    "alter table historical_trial_events add column if not exists event_date_review_reason text;",
+    (
+        "alter table historical_trial_events add column if not exists "
+        "event_date_override_applied boolean not null default false;"
+    ),
 ]
 
 

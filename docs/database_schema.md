@@ -233,6 +233,16 @@ Core fields:
 - `event_date_source_rank` makes the source-precedence model queryable and auditable in SQL.
 - `event_date_quality_score` and `event_date_quality_tier` make event-date quality usable in downstream cohorts, audits, and models.
 - `event_date_reviews` is the schema foundation for later human review of weak or ambiguous catalyst-date proxies.
+
+### Historical event review provenance
+
+`historical_trial_events` now also preserves event-date review provenance through:
+
+- `event_date_review_status`
+- `event_date_review_reason`
+- `event_date_override_applied`
+
+This makes it possible to distinguish raw machine-selected catalyst dates from reviewed timing overrides in the persisted research dataset.
 - Nested arrays and source-rich objects should remain JSONB until there is a proven need to normalize them further.
 
 ## Minimal SQL Shape

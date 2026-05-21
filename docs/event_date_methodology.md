@@ -27,6 +27,8 @@ This makes event-date quality control auditable in the same spirit as sponsor-ma
 
 Approved event-date reviews can now also feed back into trial analysis, so reviewed timing corrections are no longer only stored for later export.
 
+When those reviewed timing corrections are used during analysis, the resulting historical event row now keeps that provenance through review-status and override-applied fields.
+
 The current operational export path for queued event-date reviews is:
 
 - `python scripts/export_event_date_reviews.py`

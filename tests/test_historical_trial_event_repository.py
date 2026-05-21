@@ -61,6 +61,9 @@ class HistoricalTrialEventRepositoryTests(unittest.TestCase):
                     "high",
                     91,
                     "high",
+                    "approved",
+                    "low_event_date_quality_score",
+                    True,
                     0.12,
                     0.18,
                     True,
@@ -85,6 +88,8 @@ class HistoricalTrialEventRepositoryTests(unittest.TestCase):
         self.assertEqual(events[0]["event_id"], 11)
         self.assertEqual(events[0]["mapped_ticker"], "PFE")
         self.assertEqual(events[0]["event_date_quality_score"], 91)
+        self.assertEqual(events[0]["event_date_review_status"], "approved")
+        self.assertTrue(events[0]["event_date_override_applied"])
         self.assertTrue(events[0]["is_model_ready"])
 
         statement, params = connection.executed[0]

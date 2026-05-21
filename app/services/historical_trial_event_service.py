@@ -26,6 +26,7 @@ class HistoricalTrialEventService:
         sponsor_mapping = analysis.get("sponsor_mapping") or {}
         market_data = analysis.get("market_data") or {}
         approval_records = (analysis.get("fda_context") or {}).get("approval_records") or []
+        event_date_review = analysis.get("event_date_review") or {}
 
         return {
             "trial_features": {
@@ -57,6 +58,11 @@ class HistoricalTrialEventService:
                 "quality_score": trial.get("event_date_quality_score"),
                 "quality_tier": trial.get("event_date_quality_tier"),
                 "issues": trial.get("event_date_quality_issues") or [],
+            },
+            "event_date_review": {
+                "review_status": (event_date_review.get("review_record") or {}).get("review_status"),
+                "review_reason": (event_date_review.get("review_record") or {}).get("review_reason"),
+                "override_applied": bool(event_date_review.get("override_applied")),
             },
             "mapping_features": {
                 "ticker": sponsor_mapping.get("ticker"),
@@ -118,6 +124,8 @@ class HistoricalTrialEventService:
         fda_context = analysis.get("fda_context") or {}
         approval_records = fda_context.get("approval_records") or []
         warnings = analysis.get("warnings") or []
+        event_date_review = analysis.get("event_date_review") or {}
+        event_date_review_record = event_date_review.get("review_record") or {}
 
         approval_application_numbers = self._normalize_unique_strings(
             [record.get("application_number") for record in approval_records]
@@ -153,6 +161,9 @@ class HistoricalTrialEventService:
             "event_date_confidence": trial.get("event_date_confidence"),
             "event_date_quality_score": trial.get("event_date_quality_score"),
             "event_date_quality_tier": trial.get("event_date_quality_tier"),
+            "event_date_review_status": event_date_review_record.get("review_status"),
+            "event_date_review_reason": event_date_review_record.get("review_reason"),
+            "event_date_override_applied": bool(event_date_review.get("override_applied")),
             "mapped_ticker": sponsor_mapping.get("ticker"),
             "mapped_cik": sponsor_mapping.get("cik"),
             "matched_company_name": sponsor_mapping.get("matched_company_name"),

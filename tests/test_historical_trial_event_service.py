@@ -68,6 +68,18 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
                 "post_window_return": 0.045455,
             },
             "warnings": [],
+            "event_date_review": {
+                "queued": False,
+                "reason": "approved_review_exists",
+                "override_applied": True,
+                "review_record": {
+                    "review_id": 301,
+                    "review_status": "approved",
+                    "review_reason": "low_event_date_quality_score",
+                    "reviewed_event_date": "2025-01-12",
+                    "reviewed_event_date_source": "results_first_posted",
+                },
+            },
         }
 
         record = service.build_event_record(analysis, analysis_id=17)
@@ -79,11 +91,16 @@ class HistoricalTrialEventServiceTests(unittest.TestCase):
         self.assertEqual(record["event_date_confidence"], "high")
         self.assertEqual(record["event_date_quality_score"], 95)
         self.assertEqual(record["event_date_quality_tier"], "high")
+        self.assertEqual(record["event_date_review_status"], "approved")
+        self.assertEqual(record["event_date_review_reason"], "low_event_date_quality_score")
+        self.assertTrue(record["event_date_override_applied"])
         self.assertEqual(record["approval_record_count"], 1)
         self.assertEqual(record["approval_application_numbers"], ["NDA000001"])
         self.assertTrue(record["is_model_ready"])
         self.assertEqual(record["feature_payload"]["mapping_features"]["match_type"], "exact_normalized")
         self.assertEqual(record["feature_payload"]["event_date_quality"]["quality_score"], 95)
+        self.assertEqual(record["feature_payload"]["event_date_review"]["review_status"], "approved")
+        self.assertTrue(record["feature_payload"]["event_date_review"]["override_applied"])
         self.assertEqual(record["feature_payload"]["model_readiness"]["issues"], [])
 
     def test_build_event_record_tracks_model_readiness_issues(self) -> None:
