@@ -28,5 +28,10 @@ This makes event-date quality control auditable in the same spirit as sponsor-ma
 The current operational export path for queued event-date reviews is:
 
 - `python scripts/export_event_date_reviews.py`
+- `python run.py export-event-date-reviews`
 
 That export layer is intended for QA, manual review, and later workflow/report integration.
+
+The full operational workflow is documented in:
+
+- `docs/event_date_review_workflow.md`
