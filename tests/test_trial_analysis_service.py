@@ -201,7 +201,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
                     "review_id": 301,
                     "review_status": "approved",
                     "reviewed_event_date": "2025-01-12",
-                    "reviewed_event_date_source": "company_press_release",
+                    "reviewed_event_date_source": "results_first_posted",
                 },
                 "override_applied": False,
             },
@@ -214,7 +214,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
                     "overall_status": "COMPLETED",
                     "therapeutic_area": "Oncology",
                     "event_date_candidate": "2025-01-12",
-                    "event_date_source": "company_press_release",
+                    "event_date_source": "results_first_posted",
                     "event_date_source_rank": None,
                     "event_date_quality_score": None,
                     "event_date_quality_tier": None,
@@ -224,7 +224,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
                     "review_id": 301,
                     "review_status": "approved",
                     "reviewed_event_date": "2025-01-12",
-                    "reviewed_event_date_source": "company_press_release",
+                    "reviewed_event_date_source": "results_first_posted",
                 },
                 "override_applied": True,
             },
@@ -242,10 +242,14 @@ class TrialAnalysisServiceTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["summary"]["event_date_candidate"], "2025-01-12")
-        self.assertEqual(result["summary"]["event_date_source"], "company_press_release")
+        self.assertEqual(result["summary"]["event_date_source"], "results_first_posted")
+        self.assertEqual(result["summary"]["event_date_source_rank"], 2)
+        self.assertEqual(result["summary"]["event_date_quality_score"], 71)
+        self.assertEqual(result["summary"]["event_date_quality_tier"], "moderate")
         self.assertEqual(result["market_data"]["event_date"], "2025-01-12")
         self.assertFalse(result["event_date_review"]["queued"])
         self.assertEqual(result["event_date_review"]["reason"], "approved_review_exists")
+        self.assertTrue(result["event_date_review"]["override_applied"])
         self.assertIn(
             "Event date used an approved reviewed override instead of the original stored proxy.",
             result["warnings"],

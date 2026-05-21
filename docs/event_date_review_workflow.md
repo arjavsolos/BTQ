@@ -156,6 +156,19 @@ This creates a clean path from:
 - to review queue
 - to reviewed final event date
 
+### Step 7. Approved reviewed event dates can be applied during trial analysis
+
+When trial analysis runs, BTQ now checks for an existing approved event-date review before continuing with market analysis.
+
+If an approved reviewed event date exists, BTQ can:
+
+- replace the original stored `event_date_candidate`
+- carry forward the reviewed event-date source
+- recompute event-date quality fields for the final reviewed timing choice
+- skip re-queueing the row for another review pass
+
+This matters because the review workflow is no longer only archival. Approved timing corrections can now affect the actual event date used for one-off trial analysis.
+
 ## What Data A Review Row Stores
 
 The `event_date_reviews` table is designed to preserve both the current proxy and the later reviewed outcome.
@@ -297,15 +310,16 @@ The event-date review workflow is now structurally present, but it is still in a
 Current limitations include:
 
 - there is not yet a dedicated human-review UI
-- reviewed event-date overrides are not yet applied back into all downstream analysis paths
 - event-date review metrics are not yet summarized in a dedicated timing-quality evaluation report
-- the workflow currently focuses on queueing and export, not full review analytics
+- reviewed event-date overrides are not yet applied back into every downstream persistence and benchmarking path
+- the workflow currently has stronger queue/export coverage than full review analytics
 
 So this workflow should currently be understood as:
 
 - implemented
 - storable
 - queueable during analysis
+- applicable during trial analysis when approved overrides exist
 - exportable
 - test-covered
 
