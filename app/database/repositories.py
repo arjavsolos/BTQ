@@ -733,8 +733,13 @@ class HistoricalTrialEventRepository:
         offset: int = 0,
         is_model_ready: bool | None = None,
         mapped_ticker: str | None = None,
+        sponsor_name: str | None = None,
         phase_label: str | None = None,
         event_date_quality_tier: str | None = None,
+        sponsor_mapping_review_status: str | None = None,
+        event_date_review_status: str | None = None,
+        sponsor_mapping_override_applied: bool | None = None,
+        event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
     ) -> list[dict[str, Any]]:
         clauses = []
@@ -746,12 +751,27 @@ class HistoricalTrialEventRepository:
         if mapped_ticker:
             clauses.append("mapped_ticker = %s")
             params.append(mapped_ticker.strip().upper())
+        if sponsor_name:
+            clauses.append("sponsor_name ilike %s")
+            params.append(f"%{sponsor_name.strip()}%")
         if phase_label:
             clauses.append("phase_label = %s")
             params.append(phase_label)
         if event_date_quality_tier:
             clauses.append("event_date_quality_tier = %s")
             params.append(event_date_quality_tier.strip().lower())
+        if sponsor_mapping_review_status:
+            clauses.append("sponsor_mapping_review_status = %s")
+            params.append(sponsor_mapping_review_status.strip().lower())
+        if event_date_review_status:
+            clauses.append("event_date_review_status = %s")
+            params.append(event_date_review_status.strip().lower())
+        if sponsor_mapping_override_applied is not None:
+            clauses.append("sponsor_mapping_override_applied = %s")
+            params.append(sponsor_mapping_override_applied)
+        if event_date_override_applied is not None:
+            clauses.append("event_date_override_applied = %s")
+            params.append(event_date_override_applied)
         if min_event_date_quality_score is not None:
             clauses.append("event_date_quality_score >= %s")
             params.append(max(0, min_event_date_quality_score))

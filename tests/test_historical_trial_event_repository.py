@@ -81,8 +81,13 @@ class HistoricalTrialEventRepositoryTests(unittest.TestCase):
             offset=5,
             is_model_ready=True,
             mapped_ticker="pfe",
+            sponsor_name="pfizer",
             phase_label="PHASE 3",
             event_date_quality_tier="High",
+            sponsor_mapping_review_status="Approved",
+            event_date_review_status="Approved",
+            sponsor_mapping_override_applied=True,
+            event_date_override_applied=True,
             min_event_date_quality_score=-5,
         )
 
@@ -99,10 +104,31 @@ class HistoricalTrialEventRepositoryTests(unittest.TestCase):
         statement, params = connection.executed[0]
         self.assertIn("where is_model_ready = %s", statement)
         self.assertIn("mapped_ticker = %s", statement)
+        self.assertIn("sponsor_name ilike %s", statement)
         self.assertIn("phase_label = %s", statement)
         self.assertIn("event_date_quality_tier = %s", statement)
+        self.assertIn("sponsor_mapping_review_status = %s", statement)
+        self.assertIn("event_date_review_status = %s", statement)
+        self.assertIn("sponsor_mapping_override_applied = %s", statement)
+        self.assertIn("event_date_override_applied = %s", statement)
         self.assertIn("event_date_quality_score >= %s", statement)
-        self.assertEqual(params, (True, "PFE", "PHASE 3", "high", 0, 25, 5))
+        self.assertEqual(
+            params,
+            (
+                True,
+                "PFE",
+                "%pfizer%",
+                "PHASE 3",
+                "high",
+                "approved",
+                "approved",
+                True,
+                True,
+                0,
+                25,
+                5,
+            ),
+        )
 
     def test_list_events_without_filters_uses_paging_only(self) -> None:
         connection = _FakeConnection()

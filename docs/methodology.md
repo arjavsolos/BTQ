@@ -258,6 +258,8 @@ Those benchmark outputs should expose compact summary sections for coverage, ret
 
 They should also be exportable in machine-friendly and human-friendly forms, including structured JSON plus lightweight Markdown or line-oriented cohort output for quick review.
 
+Benchmarking should support review-aware cohort filters as well, so sponsor-reviewed rows, event-date-reviewed rows, and override-heavy subsets can be compared directly instead of only broad phase or ticker buckets.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition

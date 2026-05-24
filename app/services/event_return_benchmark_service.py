@@ -182,8 +182,13 @@ class EventReturnBenchmarkService:
         offset: int = 0,
         is_model_ready: bool | None = None,
         mapped_ticker: str | None = None,
+        sponsor_name: str | None = None,
         phase_label: str | None = None,
         event_date_quality_tier: str | None = None,
+        sponsor_mapping_review_status: str | None = None,
+        event_date_review_status: str | None = None,
+        sponsor_mapping_override_applied: bool | None = None,
+        event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
     ) -> dict[str, Any]:
         resolved_group_by = self._normalize_group_by(group_by)
@@ -192,8 +197,13 @@ class EventReturnBenchmarkService:
             offset=offset,
             is_model_ready=is_model_ready,
             mapped_ticker=mapped_ticker,
+            sponsor_name=sponsor_name,
             phase_label=phase_label,
             event_date_quality_tier=event_date_quality_tier,
+            sponsor_mapping_review_status=sponsor_mapping_review_status,
+            event_date_review_status=event_date_review_status,
+            sponsor_mapping_override_applied=sponsor_mapping_override_applied,
+            event_date_override_applied=event_date_override_applied,
             min_event_date_quality_score=min_event_date_quality_score,
         )
 
@@ -236,8 +246,13 @@ class EventReturnBenchmarkService:
         offset: int = 0,
         is_model_ready: bool | None = None,
         mapped_ticker: str | None = None,
+        sponsor_name: str | None = None,
         phase_label: str | None = None,
         event_date_quality_tier: str | None = None,
+        sponsor_mapping_review_status: str | None = None,
+        event_date_review_status: str | None = None,
+        sponsor_mapping_override_applied: bool | None = None,
+        event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
     ) -> dict[str, Any]:
         with get_connection() as connection:
@@ -250,7 +265,12 @@ class EventReturnBenchmarkService:
                 offset=offset,
                 is_model_ready=is_model_ready,
                 mapped_ticker=mapped_ticker,
+                sponsor_name=sponsor_name,
                 phase_label=phase_label,
                 event_date_quality_tier=event_date_quality_tier,
+                sponsor_mapping_review_status=sponsor_mapping_review_status,
+                event_date_review_status=event_date_review_status,
+                sponsor_mapping_override_applied=sponsor_mapping_override_applied,
+                event_date_override_applied=event_date_override_applied,
                 min_event_date_quality_score=min_event_date_quality_score,
             )

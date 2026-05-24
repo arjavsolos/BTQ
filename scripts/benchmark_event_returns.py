@@ -86,8 +86,13 @@ def main() -> None:
         offset=_get_int_env("EVENT_RETURN_BENCHMARK_OFFSET", 0),
         is_model_ready=_get_optional_bool_env("EVENT_RETURN_BENCHMARK_MODEL_READY"),
         mapped_ticker=_get_str_env("EVENT_RETURN_BENCHMARK_MAPPED_TICKER"),
+        sponsor_name=_get_str_env("EVENT_RETURN_BENCHMARK_SPONSOR"),
         phase_label=_get_str_env("EVENT_RETURN_BENCHMARK_PHASE"),
         event_date_quality_tier=_get_str_env("EVENT_RETURN_BENCHMARK_EVENT_DATE_QUALITY_TIER"),
+        sponsor_mapping_review_status=_get_str_env("EVENT_RETURN_BENCHMARK_SPONSOR_MAPPING_REVIEW_STATUS"),
+        event_date_review_status=_get_str_env("EVENT_RETURN_BENCHMARK_EVENT_DATE_REVIEW_STATUS"),
+        sponsor_mapping_override_applied=_get_optional_bool_env("EVENT_RETURN_BENCHMARK_SPONSOR_MAPPING_OVERRIDE"),
+        event_date_override_applied=_get_optional_bool_env("EVENT_RETURN_BENCHMARK_EVENT_DATE_OVERRIDE"),
         min_event_date_quality_score=(
             _get_int_env("EVENT_RETURN_BENCHMARK_MIN_EVENT_DATE_QUALITY_SCORE", 0)
             if os.getenv("EVENT_RETURN_BENCHMARK_MIN_EVENT_DATE_QUALITY_SCORE") not in {None, ""}

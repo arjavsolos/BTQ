@@ -16,8 +16,13 @@ class _BenchmarkRepositoryStub:
         offset: int = 0,
         is_model_ready: bool | None = None,
         mapped_ticker: str | None = None,
+        sponsor_name: str | None = None,
         phase_label: str | None = None,
         event_date_quality_tier: str | None = None,
+        sponsor_mapping_review_status: str | None = None,
+        event_date_review_status: str | None = None,
+        sponsor_mapping_override_applied: bool | None = None,
+        event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
     ) -> list[dict]:
         self.list_events_calls.append(
@@ -26,8 +31,13 @@ class _BenchmarkRepositoryStub:
                 "offset": offset,
                 "is_model_ready": is_model_ready,
                 "mapped_ticker": mapped_ticker,
+                "sponsor_name": sponsor_name,
                 "phase_label": phase_label,
                 "event_date_quality_tier": event_date_quality_tier,
+                "sponsor_mapping_review_status": sponsor_mapping_review_status,
+                "event_date_review_status": event_date_review_status,
+                "sponsor_mapping_override_applied": sponsor_mapping_override_applied,
+                "event_date_override_applied": event_date_override_applied,
                 "min_event_date_quality_score": min_event_date_quality_score,
             }
         )
@@ -101,8 +111,13 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
                 "offset": 5,
                 "is_model_ready": None,
                 "mapped_ticker": "PFE",
+                "sponsor_name": None,
                 "phase_label": None,
                 "event_date_quality_tier": "high",
+                "sponsor_mapping_review_status": None,
+                "event_date_review_status": None,
+                "sponsor_mapping_override_applied": None,
+                "event_date_override_applied": None,
                 "min_event_date_quality_score": 80,
             },
         )
@@ -141,6 +156,38 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["groups"][0]["group"], "UNKNOWN")
         self.assertEqual(result["groups"][1]["group"], "approved")
+
+    def test_build_benchmark_passes_review_provenance_filters(self) -> None:
+        service = EventReturnBenchmarkService()
+        repository = _BenchmarkRepositoryStub([])
+
+        service.build_benchmark_from_repository(
+            repository=repository,
+            group_by="event_date_review_status",
+            sponsor_name="Pfizer",
+            sponsor_mapping_review_status="approved",
+            event_date_review_status="approved",
+            sponsor_mapping_override_applied=True,
+            event_date_override_applied=True,
+        )
+
+        self.assertEqual(
+            repository.list_events_calls[0],
+            {
+                "limit": 1000,
+                "offset": 0,
+                "is_model_ready": None,
+                "mapped_ticker": None,
+                "sponsor_name": "Pfizer",
+                "phase_label": None,
+                "event_date_quality_tier": None,
+                "sponsor_mapping_review_status": "approved",
+                "event_date_review_status": "approved",
+                "sponsor_mapping_override_applied": True,
+                "event_date_override_applied": True,
+                "min_event_date_quality_score": None,
+            },
+        )
 
     def test_build_benchmark_rejects_invalid_group_by(self) -> None:
         service = EventReturnBenchmarkService()

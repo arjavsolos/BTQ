@@ -221,8 +221,13 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_event_returns.add_argument("--offset", type=int, default=0)
     benchmark_event_returns.add_argument("--is-model-ready", action="store_true")
     benchmark_event_returns.add_argument("--mapped-ticker")
+    benchmark_event_returns.add_argument("--sponsor")
     benchmark_event_returns.add_argument("--phase")
     benchmark_event_returns.add_argument("--event-date-quality-tier")
+    benchmark_event_returns.add_argument("--sponsor-mapping-review-status")
+    benchmark_event_returns.add_argument("--event-date-review-status")
+    benchmark_event_returns.add_argument("--sponsor-mapping-override", action="store_true")
+    benchmark_event_returns.add_argument("--event-date-override", action="store_true")
     benchmark_event_returns.add_argument("--min-event-date-quality-score", type=int)
     benchmark_event_returns.add_argument("--format", choices=["json", "jsonl", "markdown"], default="json")
     return parser
@@ -416,8 +421,13 @@ def main() -> None:
             offset=args.offset,
             is_model_ready=True if args.is_model_ready else None,
             mapped_ticker=args.mapped_ticker,
+            sponsor_name=args.sponsor,
             phase_label=args.phase,
             event_date_quality_tier=args.event_date_quality_tier,
+            sponsor_mapping_review_status=args.sponsor_mapping_review_status,
+            event_date_review_status=args.event_date_review_status,
+            sponsor_mapping_override_applied=True if args.sponsor_mapping_override else None,
+            event_date_override_applied=True if args.event_date_override else None,
             min_event_date_quality_score=args.min_event_date_quality_score,
         )
         if args.format == "jsonl":
