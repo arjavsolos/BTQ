@@ -20,6 +20,7 @@ from app.database.repositories import (
 )
 from app.research import build_methodology_snapshot, render_methodology_markdown
 from app.services import (
+    EventReturnBenchmarkService,
     HistoricalDatasetAuditService,
     HistoricalDatasetBackfillService,
     TrialAnalysisService,
@@ -171,6 +172,29 @@ def build_parser() -> argparse.ArgumentParser:
     export_event_date_reviews.add_argument("--event-date-quality-tier")
     export_event_date_reviews.add_argument("--format", choices=["json", "jsonl"], default="json")
     export_event_date_reviews.add_argument("--include-summary", action="store_true")
+
+    benchmark_event_returns = subparsers.add_parser(
+        "benchmark-event-returns",
+        help="Summarize historical event returns by a chosen cohort field",
+    )
+    benchmark_event_returns.add_argument(
+        "--group-by",
+        choices=[
+            "phase_label",
+            "mapped_ticker",
+            "event_date_quality_tier",
+            "sponsor_mapping_review_status",
+            "event_date_review_status",
+        ],
+        default="phase_label",
+    )
+    benchmark_event_returns.add_argument("--limit", type=int, default=1000)
+    benchmark_event_returns.add_argument("--offset", type=int, default=0)
+    benchmark_event_returns.add_argument("--is-model-ready", action="store_true")
+    benchmark_event_returns.add_argument("--mapped-ticker")
+    benchmark_event_returns.add_argument("--phase")
+    benchmark_event_returns.add_argument("--event-date-quality-tier")
+    benchmark_event_returns.add_argument("--min-event-date-quality-score", type=int)
     return parser
 
 
@@ -352,6 +376,21 @@ def main() -> None:
         if args.include_summary:
             payload["summary"] = _build_event_date_review_export_summary(reviews)
         print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "benchmark-event-returns":
+        service = EventReturnBenchmarkService()
+        result = service.benchmark_dataset(
+            group_by=args.group_by,
+            limit=args.limit,
+            offset=args.offset,
+            is_model_ready=True if args.is_model_ready else None,
+            mapped_ticker=args.mapped_ticker,
+            phase_label=args.phase,
+            event_date_quality_tier=args.event_date_quality_tier,
+            min_event_date_quality_score=args.min_event_date_quality_score,
+        )
+        print(json.dumps(result, indent=2, ensure_ascii=True))
         return
 
     raise SystemExit(f"Unknown command: {args.command}")

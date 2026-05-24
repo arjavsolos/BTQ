@@ -252,6 +252,8 @@ Audit outputs should also summarize how often sponsor-mapping review provenance 
 
 Historical event export should preserve the key event-date-quality and model-readiness fields so stored cohort slices can be inspected outside the database without losing the main QA signals.
 
+The project should also support grouped event-return benchmarking over the stored historical dataset so cohort-level expected-reaction summaries can be evaluated before any more advanced predictive layer is trusted.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition
