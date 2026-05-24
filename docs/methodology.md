@@ -274,6 +274,8 @@ Single-trial analysis should also compare the observed event-day return against 
 
 Single-trial analysis should include a plain-language final comparison summary that names the conclusion, expected direction, confidence tier, event-date quality tier, return gap, and caveats. This is the analyst-facing bridge between raw pipeline fields and the final market-versus-model output style.
 
+The API layer should preserve these same final comparison fields in trial-analysis responses so UI, report, and external consumers receive the expected-reaction profile, observed-versus-expected comparison, and final summary without reassembling them from lower-level service payloads.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition
