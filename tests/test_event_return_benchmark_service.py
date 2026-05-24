@@ -93,13 +93,16 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         self.assertEqual(result["summary_sections"][0]["metrics"]["model_ready_count"], 2)
         self.assertEqual(result["summary_sections"][1]["title"], "returns")
         self.assertEqual(result["summary_sections"][2]["title"], "review_provenance")
-        self.assertEqual(result["summary_sections"][3]["title"], "cohort_comparisons")
-        self.assertEqual(result["summary_sections"][4]["title"], "top_groups")
-        self.assertEqual(result["summary_sections"][4]["metrics"]["top_positive_group"], "PHASE3")
-        self.assertEqual(result["summary_sections"][4]["metrics"]["top_negative_group"], "PHASE2")
+        self.assertEqual(result["summary_sections"][3]["title"], "sample_size_warnings")
+        self.assertEqual(result["summary_sections"][4]["title"], "cohort_comparisons")
+        self.assertEqual(result["summary_sections"][5]["title"], "top_groups")
+        self.assertEqual(result["summary_sections"][5]["metrics"]["top_positive_group"], "PHASE3")
+        self.assertEqual(result["summary_sections"][5]["metrics"]["top_negative_group"], "PHASE2")
         self.assertEqual(result["summary_sections"][2]["metrics"]["event_date_override_applied_count"], 1)
         self.assertEqual(result["groups"][0]["group"], "PHASE3")
         self.assertEqual(result["groups"][0]["event_count"], 2)
+        self.assertTrue(result["groups"][0]["is_small_sample"])
+        self.assertIn("Only 2 event(s)", result["groups"][0]["small_sample_warning"])
         self.assertEqual(result["groups"][0]["model_ready_ratio"], 0.5)
         self.assertEqual(result["groups"][0]["average_event_day_return"], 0.05)
         self.assertEqual(result["groups"][0]["median_event_day_return"], 0.05)
@@ -235,7 +238,7 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         )
 
         result = service.build_benchmark_from_repository(repository=repository, group_by="phase_label")
-        comparison_section = result["summary_sections"][3]
+        comparison_section = result["summary_sections"][4]
 
         self.assertEqual(comparison_section["title"], "cohort_comparisons")
         self.assertEqual(comparison_section["metrics"]["model_ready_event_count"], 2)
@@ -248,6 +251,45 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         self.assertEqual(comparison_section["metrics"]["clean_average_event_day_return"], 0.04)
         self.assertEqual(comparison_section["metrics"]["model_ready_minus_non_model_ready_return_gap"], 0.09)
         self.assertEqual(comparison_section["metrics"]["review_heavy_minus_clean_return_gap"], 0.0)
+
+    def test_build_benchmark_marks_small_sample_groups_against_threshold(self) -> None:
+        service = EventReturnBenchmarkService()
+        repository = _BenchmarkRepositoryStub(
+            [
+                {
+                    "phase_label": "PHASE3",
+                    "event_day_return": 0.10,
+                    "post_window_return": 0.03,
+                    "is_model_ready": True,
+                },
+                {
+                    "phase_label": "PHASE2",
+                    "event_day_return": 0.02,
+                    "post_window_return": 0.01,
+                    "is_model_ready": True,
+                },
+                {
+                    "phase_label": "PHASE2",
+                    "event_day_return": 0.04,
+                    "post_window_return": 0.01,
+                    "is_model_ready": True,
+                },
+            ]
+        )
+
+        result = service.build_benchmark_from_repository(
+            repository=repository,
+            group_by="phase_label",
+            min_group_size=2,
+        )
+        warning_section = result["summary_sections"][3]
+
+        self.assertEqual(warning_section["title"], "sample_size_warnings")
+        self.assertEqual(warning_section["metrics"]["min_group_size"], 2)
+        self.assertEqual(warning_section["metrics"]["small_sample_group_count"], 1)
+        self.assertEqual(warning_section["metrics"]["small_sample_groups"], ["PHASE3"])
+        self.assertTrue(result["groups"][1]["is_small_sample"])
+        self.assertIsNone(result["groups"][0]["small_sample_warning"])
 
     def test_build_benchmark_passes_review_provenance_filters(self) -> None:
         service = EventReturnBenchmarkService()

@@ -98,6 +98,7 @@ def main() -> None:
             if os.getenv("EVENT_RETURN_BENCHMARK_MIN_EVENT_DATE_QUALITY_SCORE") not in {None, ""}
             else None
         ),
+        min_group_size=_get_int_env("EVENT_RETURN_BENCHMARK_MIN_GROUP_SIZE", 5),
     )
     output_format = _get_format_env("EVENT_RETURN_BENCHMARK_FORMAT", "json")
     if output_format == "jsonl":

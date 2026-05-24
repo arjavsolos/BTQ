@@ -231,6 +231,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_event_returns.add_argument("--sponsor-mapping-override", action="store_true")
     benchmark_event_returns.add_argument("--event-date-override", action="store_true")
     benchmark_event_returns.add_argument("--min-event-date-quality-score", type=int)
+    benchmark_event_returns.add_argument("--min-group-size", type=int, default=5)
     benchmark_event_returns.add_argument("--format", choices=["json", "jsonl", "markdown"], default="json")
     return parser
 
@@ -431,6 +432,7 @@ def main() -> None:
             sponsor_mapping_override_applied=True if args.sponsor_mapping_override else None,
             event_date_override_applied=True if args.event_date_override else None,
             min_event_date_quality_score=args.min_event_date_quality_score,
+            min_group_size=args.min_group_size,
         )
         if args.format == "jsonl":
             for group in result.get("groups") or []:

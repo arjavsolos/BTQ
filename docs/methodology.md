@@ -264,6 +264,8 @@ Benchmarking should support review-aware cohort filters as well, so sponsor-revi
 
 Benchmark grouping should also support domain-meaningful cohorts such as `therapeutic_area` and `sponsor_class`, so expected-reaction summaries can be sliced along biotech-relevant lines instead of only generic workflow fields.
 
+Benchmark reports should mark cohorts below a configurable minimum group size and include a sample-size warning section, because return summaries from tiny biotech cohorts are useful for exploration but should not be treated as stable estimates.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition

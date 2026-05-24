@@ -29,6 +29,7 @@ class _BenchmarkServiceStub:
         sponsor_mapping_override_applied: bool | None = None,
         event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
+        min_group_size: int | None = None,
     ) -> dict:
         self.calls.append(
             {
@@ -45,6 +46,7 @@ class _BenchmarkServiceStub:
                 "sponsor_mapping_override_applied": sponsor_mapping_override_applied,
                 "event_date_override_applied": event_date_override_applied,
                 "min_event_date_quality_score": min_event_date_quality_score,
+                "min_group_size": min_group_size,
             }
         )
         return {
@@ -53,6 +55,11 @@ class _BenchmarkServiceStub:
             "summary": {"event_count": 3, "group_count": 2},
             "summary_sections": [
                 {"title": "coverage", "metrics": {"event_count": 3}, "display_summary": "coverage"},
+                {
+                    "title": "sample_size_warnings",
+                    "metrics": {"small_sample_group_count": 1},
+                    "display_summary": "sample warnings",
+                },
                 {
                     "title": "cohort_comparisons",
                     "metrics": {"model_ready_event_count": 2},
@@ -90,6 +97,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
                     "EVENT_RETURN_BENCHMARK_SPONSOR_MAPPING_OVERRIDE": "true",
                     "EVENT_RETURN_BENCHMARK_EVENT_DATE_OVERRIDE": "true",
                     "EVENT_RETURN_BENCHMARK_MIN_EVENT_DATE_QUALITY_SCORE": "80",
+                    "EVENT_RETURN_BENCHMARK_MIN_GROUP_SIZE": "3",
                 },
                 clear=False,
             ),
@@ -103,8 +111,8 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         self.assertEqual(payload["group_by"], "sponsor_class")
         self.assertEqual(payload["summary"]["event_count"], 3)
         self.assertEqual(payload["summary_sections"][0]["title"], "coverage")
-        self.assertEqual(payload["summary_sections"][1]["title"], "cohort_comparisons")
-        self.assertEqual(payload["summary_sections"][2]["title"], "top_groups")
+        self.assertEqual(payload["summary_sections"][1]["title"], "sample_size_warnings")
+        self.assertEqual(payload["summary_sections"][2]["title"], "cohort_comparisons")
         self.assertEqual(
             service.calls[0],
             {
@@ -121,6 +129,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
                 "sponsor_mapping_override_applied": True,
                 "event_date_override_applied": True,
                 "min_event_date_quality_score": 80,
+                "min_group_size": 3,
             },
         )
 
@@ -144,6 +153,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("# Event Return Benchmark", output)
         self.assertIn("## Summary Sections", output)
+        self.assertIn("### sample_size_warnings", output)
         self.assertIn("### cohort_comparisons", output)
         self.assertIn("### top_groups", output)
 

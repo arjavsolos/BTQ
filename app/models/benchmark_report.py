@@ -16,6 +16,8 @@ class BenchmarkSummary:
 class BenchmarkGroup:
     group: str
     event_count: int
+    is_small_sample: bool
+    small_sample_warning: str | None
     model_ready_count: int
     model_ready_ratio: float | None
     event_day_return_count: int

@@ -35,6 +35,7 @@ class _BenchmarkServiceStub:
         sponsor_mapping_override_applied: bool | None = None,
         event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
+        min_group_size: int | None = None,
     ) -> dict:
         self.calls.append(
             {
@@ -51,6 +52,7 @@ class _BenchmarkServiceStub:
                 "sponsor_mapping_override_applied": sponsor_mapping_override_applied,
                 "event_date_override_applied": event_date_override_applied,
                 "min_event_date_quality_score": min_event_date_quality_score,
+                "min_group_size": min_group_size,
             }
         )
         return dict(self.result)
@@ -274,6 +276,8 @@ class RunParserTests(unittest.TestCase):
                 "--event-date-override",
                 "--min-event-date-quality-score",
                 "80",
+                "--min-group-size",
+                "3",
                 "--format",
                 "markdown",
             ]
@@ -293,6 +297,7 @@ class RunParserTests(unittest.TestCase):
         self.assertTrue(args.sponsor_mapping_override)
         self.assertTrue(args.event_date_override)
         self.assertEqual(args.min_event_date_quality_score, 80)
+        self.assertEqual(args.min_group_size, 3)
         self.assertEqual(args.format, "markdown")
 
     def test_main_exports_historical_events_with_summary(self) -> None:
@@ -432,6 +437,7 @@ class RunParserTests(unittest.TestCase):
                 "summary": {"event_count": 3, "group_count": 2},
                 "summary_sections": [
                     {"title": "coverage", "metrics": {}, "display_summary": "coverage"},
+                    {"title": "sample_size_warnings", "metrics": {}, "display_summary": "sample warnings"},
                     {"title": "cohort_comparisons", "metrics": {}, "display_summary": "comparisons"},
                     {"title": "top_groups", "metrics": {}, "display_summary": "top groups"},
                 ],
@@ -470,6 +476,8 @@ class RunParserTests(unittest.TestCase):
                     "--event-date-override",
                     "--min-event-date-quality-score",
                     "80",
+                    "--min-group-size",
+                    "3",
                     "--format",
                     "markdown",
                 ],
@@ -481,6 +489,7 @@ class RunParserTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertIn("# Event Return Benchmark", output)
+        self.assertIn("### sample_size_warnings", output)
         self.assertIn("### cohort_comparisons", output)
         self.assertIn("### top_groups", output)
         self.assertIn("PHASE3", output)
@@ -500,6 +509,7 @@ class RunParserTests(unittest.TestCase):
                 "sponsor_mapping_override_applied": True,
                 "event_date_override_applied": True,
                 "min_event_date_quality_score": 80,
+                "min_group_size": 3,
             },
         )
 

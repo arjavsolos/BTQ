@@ -76,7 +76,17 @@ class EventReturnBenchmarkService:
             ),
         }
 
-    def _build_group_summary(self, group_value: str, events: list[dict[str, Any]]) -> BenchmarkGroup:
+    def _normalize_min_group_size(self, min_group_size: int | None) -> int:
+        if min_group_size is None:
+            return 5
+        return max(1, int(min_group_size))
+
+    def _build_group_summary(
+        self,
+        group_value: str,
+        events: list[dict[str, Any]],
+        min_group_size: int,
+    ) -> BenchmarkGroup:
         event_day_returns = [
             float(event["event_day_return"])
             for event in events
@@ -90,10 +100,17 @@ class EventReturnBenchmarkService:
         model_ready_count = sum(1 for event in events if event.get("is_model_ready"))
         positive_event_day_count = sum(1 for value in event_day_returns if value > 0)
         override_applied_count = sum(1 for event in events if event.get("event_date_override_applied"))
+        is_small_sample = len(events) < min_group_size
 
         return BenchmarkGroup(
             group=group_value,
             event_count=len(events),
+            is_small_sample=is_small_sample,
+            small_sample_warning=(
+                f"Only {len(events)} event(s); interpret this cohort cautiously."
+                if is_small_sample
+                else None
+            ),
             model_ready_count=model_ready_count,
             model_ready_ratio=None if not events else round(model_ready_count / len(events), 6),
             event_day_return_count=len(event_day_returns),
@@ -112,6 +129,7 @@ class EventReturnBenchmarkService:
         summary: BenchmarkSummary,
         groups: list[BenchmarkGroup],
         events: list[dict[str, Any]],
+        min_group_size: int,
     ) -> list[BenchmarkSummarySection]:
         model_ready_count = sum(1 for event in events if event.get("is_model_ready"))
         event_date_override_count = sum(1 for event in events if event.get("event_date_override_applied"))
@@ -165,6 +183,19 @@ class EventReturnBenchmarkService:
             display_summary=(
                 f"{event_date_override_count} rows used approved event-date overrides and "
                 f"{sponsor_mapping_override_count} used sponsor-mapping overrides."
+            ),
+        )
+        small_sample_groups = [group for group in groups if group.is_small_sample]
+        small_sample_section = BenchmarkSummarySection(
+            title="sample_size_warnings",
+            metrics={
+                "min_group_size": min_group_size,
+                "small_sample_group_count": len(small_sample_groups),
+                "small_sample_groups": [group.group for group in small_sample_groups],
+            },
+            display_summary=(
+                f"{len(small_sample_groups)} cohort(s) are below the minimum group size of "
+                f"{min_group_size}; treat their return estimates as directional only."
             ),
         )
         model_ready_events = [event for event in events if event.get("is_model_ready")]
@@ -249,7 +280,14 @@ class EventReturnBenchmarkService:
                 f"at {None if top_negative_group is None else top_negative_group.average_event_day_return}."
             ),
         )
-        return [coverage_section, returns_section, review_section, comparison_section, top_groups_section]
+        return [
+            coverage_section,
+            returns_section,
+            review_section,
+            small_sample_section,
+            comparison_section,
+            top_groups_section,
+        ]
 
     def build_benchmark_from_repository(
         self,
@@ -267,8 +305,10 @@ class EventReturnBenchmarkService:
         sponsor_mapping_override_applied: bool | None = None,
         event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
+        min_group_size: int | None = None,
     ) -> dict[str, Any]:
         resolved_group_by = self._normalize_group_by(group_by)
+        resolved_min_group_size = self._normalize_min_group_size(min_group_size)
         events = repository.list_events(
             limit=limit,
             offset=offset,
@@ -289,7 +329,7 @@ class EventReturnBenchmarkService:
             grouped_events.setdefault(self._coerce_group_value(event, resolved_group_by), []).append(event)
 
         groups = [
-            self._build_group_summary(group_value, group_events)
+            self._build_group_summary(group_value, group_events, resolved_min_group_size)
             for group_value, group_events in sorted(
                 grouped_events.items(),
                 key=lambda item: (-len(item[1]), item[0]),
@@ -311,7 +351,7 @@ class EventReturnBenchmarkService:
             status="success",
             group_by=resolved_group_by,
             summary=summary,
-            summary_sections=self._build_summary_sections(summary, groups, events),
+            summary_sections=self._build_summary_sections(summary, groups, events, resolved_min_group_size),
             groups=groups,
         )
         return report.to_dict()
@@ -331,6 +371,7 @@ class EventReturnBenchmarkService:
         sponsor_mapping_override_applied: bool | None = None,
         event_date_override_applied: bool | None = None,
         min_event_date_quality_score: int | None = None,
+        min_group_size: int | None = None,
     ) -> dict[str, Any]:
         with get_connection() as connection:
             repository = HistoricalTrialEventRepository(connection)
@@ -350,4 +391,5 @@ class EventReturnBenchmarkService:
                 sponsor_mapping_override_applied=sponsor_mapping_override_applied,
                 event_date_override_applied=event_date_override_applied,
                 min_event_date_quality_score=min_event_date_quality_score,
+                min_group_size=min_group_size,
             )
