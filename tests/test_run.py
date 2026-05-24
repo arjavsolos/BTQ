@@ -129,6 +129,73 @@ class _ConnectionStub:
         return None
 
 
+class _TrialAnalysisServiceStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def analyze_trial(
+        self,
+        nct_id: str,
+        approval_limit: int = 5,
+        market_pre_days: int = 5,
+        market_post_days: int = 5,
+        include_raw_trial: bool = False,
+        save_to_db: bool = False,
+    ) -> dict:
+        self.calls.append(
+            {
+                "nct_id": nct_id,
+                "approval_limit": approval_limit,
+                "market_pre_days": market_pre_days,
+                "market_post_days": market_post_days,
+                "include_raw_trial": include_raw_trial,
+                "save_to_db": save_to_db,
+            }
+        )
+        final_summary = {
+            "headline": "Observed market reaction was stronger than historical expectation.",
+            "conclusion": "stronger_than_expected",
+            "expected_direction": "positive",
+            "expected_reaction_confidence": "moderate",
+            "event_date_quality_tier": "high",
+            "return_gap": 0.043,
+            "confidence_notes": [],
+        }
+        return {
+            "status": "success",
+            "summary": {
+                "nct_id": nct_id,
+                "sponsor_name": "Pfizer Inc",
+                "mapped_ticker": "PFE",
+                "phase_label": "PHASE3",
+                "therapeutic_area": "Oncology",
+                "event_date_candidate": "2025-01-15",
+                "final_comparison_summary": final_summary,
+            },
+            "event_date_quality": {
+                "quality_tier": "high",
+                "quality_score": 95,
+                "source": "primary_completion_date",
+                "precision": "day",
+            },
+            "expected_reaction": {
+                "profile": {
+                    "expected_direction": "positive",
+                    "confidence_tier": "moderate",
+                    "caveats": [],
+                }
+            },
+            "market_expected_reaction_comparison": {
+                "status": "available",
+                "classification": "stronger_than_expected",
+                "actual_event_day_return": 0.123,
+                "expected_event_day_return": 0.08,
+            },
+            "final_comparison_summary": final_summary,
+            "warnings": [],
+        }
+
+
 class RunParserTests(unittest.TestCase):
     def test_build_parser_supports_sponsor_mapping_review_export_command(self) -> None:
         parser = run.build_parser()
@@ -300,6 +367,50 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(args.min_event_date_quality_score, 80)
         self.assertEqual(args.min_group_size, 3)
         self.assertEqual(args.format, "markdown")
+
+    def test_main_renders_trial_analysis_markdown_report(self) -> None:
+        service = _TrialAnalysisServiceStub()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "run.py",
+                    "analyze-trial",
+                    "NCT00000001",
+                    "--approval-limit",
+                    "7",
+                    "--market-pre-days",
+                    "3",
+                    "--market-post-days",
+                    "9",
+                    "--include-raw-trial",
+                    "--format",
+                    "markdown",
+                ],
+            ),
+            patch("run.TrialAnalysisService", return_value=service),
+            redirect_stdout(stdout),
+        ):
+            run.main()
+
+        output = stdout.getvalue()
+        self.assertIn("# Trial Analysis Report", output)
+        self.assertIn("Observed market reaction was stronger than historical expectation.", output)
+        self.assertIn("**Mapped ticker:** `PFE`", output)
+        self.assertEqual(
+            service.calls[0],
+            {
+                "nct_id": "NCT00000001",
+                "approval_limit": 7,
+                "market_pre_days": 3,
+                "market_post_days": 9,
+                "include_raw_trial": True,
+                "save_to_db": False,
+            },
+        )
 
     def test_main_exports_historical_events_with_summary(self) -> None:
         repository = _HistoricalEventRepositoryStub(

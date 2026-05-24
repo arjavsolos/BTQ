@@ -18,7 +18,7 @@ from app.database.repositories import (
     SponsorMappingReviewRepository,
     initialize_database,
 )
-from app.research import build_methodology_snapshot, render_methodology_markdown
+from app.research import build_methodology_snapshot, render_methodology_markdown, render_trial_analysis_markdown
 from app.services import (
     EventReturnBenchmarkService,
     HistoricalDatasetAuditService,
@@ -127,6 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--include-raw-trial", action="store_true")
     analyze.add_argument("--save", action="store_true")
     analyze.add_argument("--summary-only", action="store_true")
+    analyze.add_argument("--format", choices=["json", "markdown"], default="json")
 
     build_dataset = subparsers.add_parser(
         "build-historical-dataset",
@@ -255,6 +256,9 @@ def main() -> None:
             include_raw_trial=args.include_raw_trial,
             save_to_db=args.save,
         )
+        if args.format == "markdown":
+            print(render_trial_analysis_markdown(result))
+            return
         payload = result["summary"] if args.summary_only else result
         print(json.dumps(payload, indent=2, ensure_ascii=True))
         return

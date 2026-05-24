@@ -276,6 +276,8 @@ Single-trial analysis should include a plain-language final comparison summary t
 
 The API layer should preserve these same final comparison fields in trial-analysis responses so UI, report, and external consumers receive the expected-reaction profile, observed-versus-expected comparison, and final summary without reassembling them from lower-level service payloads.
 
+The reporting layer should render the same trial-analysis payload into a concise Markdown report with final comparison, trial identity, observed-versus-expected reaction, event-date quality, and caveats. That report should be generated from the structured payload rather than from a separate interpretation path.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition
