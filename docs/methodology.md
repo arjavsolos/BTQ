@@ -268,6 +268,8 @@ Benchmark reports should mark cohorts below a configurable minimum group size an
 
 Benchmark reports should also expose a compact `expected_reaction_profile` with direction, confidence tier, event-day return summary, post-window return summary, and caveats. Later probability and market-comparison layers should consume that profile instead of reverse-engineering expected reaction from lower-level group rows.
 
+Single-trial analysis should attach that expected-reaction context when historical benchmarks are available, preserving both the full benchmark context and a compact summary-level profile for report and API consumers.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition

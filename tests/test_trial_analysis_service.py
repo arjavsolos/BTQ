@@ -145,6 +145,53 @@ class _EventDateReviewStub:
         return self.override_result
 
 
+class _ExpectedReactionBenchmarkStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def benchmark_dataset(
+        self,
+        group_by: str = "phase_label",
+        limit: int = 1000,
+        offset: int = 0,
+        is_model_ready: bool | None = None,
+        phase_label: str | None = None,
+        event_date_quality_tier: str | None = None,
+        min_group_size: int | None = None,
+        **_: object,
+    ) -> dict:
+        self.calls.append(
+            {
+                "group_by": group_by,
+                "limit": limit,
+                "offset": offset,
+                "is_model_ready": is_model_ready,
+                "phase_label": phase_label,
+                "event_date_quality_tier": event_date_quality_tier,
+                "min_group_size": min_group_size,
+            }
+        )
+        return {
+            "status": "success",
+            "group_by": group_by,
+            "summary": {"event_count": 30, "group_count": 2},
+            "expected_reaction_profile": {
+                "expected_direction": "positive",
+                "confidence_tier": "moderate",
+                "average_event_day_return": 0.08,
+                "median_event_day_return": 0.05,
+                "caveats": [],
+            },
+            "summary_sections": [
+                {
+                    "title": "sample_size_warnings",
+                    "metrics": {"small_sample_group_count": 0},
+                    "display_summary": "No small sample groups.",
+                }
+            ],
+        }
+
+
 class TrialAnalysisServiceTests(unittest.TestCase):
     def test_analyze_trial_returns_joined_output(self) -> None:
         service = TrialAnalysisService(
@@ -154,6 +201,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             market_data_ingestor=_MarketStub(),
             sponsor_mapping_review_service=_SponsorReviewStub(),
             event_date_review_service=_EventDateReviewStub(),
+            expected_reaction_benchmark_service=_ExpectedReactionBenchmarkStub(),
         )
 
         result = service.analyze_trial("NCT00000001")
@@ -171,6 +219,49 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["market_data"]["event_day_return"], 0.123)
         self.assertEqual(result["warnings"], [])
 
+    def test_analyze_trial_attaches_expected_reaction_context(self) -> None:
+        benchmark_stub = _ExpectedReactionBenchmarkStub()
+        service = TrialAnalysisService(
+            clinical_trials_ingestor=_ClinicalStub(),
+            sec_mapper=_SecStub(),
+            openfda_ingestor=_OpenFDAStub(),
+            market_data_ingestor=_MarketStub(),
+            sponsor_mapping_review_service=_SponsorReviewStub(),
+            event_date_review_service=_EventDateReviewStub(),
+            expected_reaction_benchmark_service=benchmark_stub,
+        )
+
+        result = service.analyze_trial("NCT00000001")
+
+        self.assertEqual(result["expected_reaction"]["status"], "available")
+        self.assertEqual(result["expected_reaction"]["group_by"], "therapeutic_area")
+        self.assertEqual(result["expected_reaction"]["mapped_ticker"], "PFE")
+        self.assertEqual(result["expected_reaction"]["profile"]["expected_direction"], "positive")
+        self.assertEqual(result["expected_reaction"]["profile"]["confidence_tier"], "moderate")
+        self.assertEqual(result["summary"]["expected_reaction_status"], "available")
+        self.assertEqual(result["summary"]["expected_reaction_profile"]["average_event_day_return"], 0.08)
+        self.assertEqual(result["expected_reaction"]["benchmark_summary"]["event_count"], 30)
+        self.assertEqual(
+            result["expected_reaction"]["cohort_filters"],
+            {
+                "is_model_ready": True,
+                "phase_label": "PHASE3",
+                "event_date_quality_tier": "high",
+            },
+        )
+        self.assertEqual(
+            benchmark_stub.calls[0],
+            {
+                "group_by": "therapeutic_area",
+                "limit": 1000,
+                "offset": 0,
+                "is_model_ready": True,
+                "phase_label": "PHASE3",
+                "event_date_quality_tier": "high",
+                "min_group_size": 5,
+            },
+        )
+
     def test_analyze_trial_uses_approved_mapping_override_when_available(self) -> None:
         service = TrialAnalysisService(
             clinical_trials_ingestor=_ClinicalStub(),
@@ -179,6 +270,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             market_data_ingestor=_MarketStub(),
             sponsor_mapping_review_service=_SponsorReviewStub(override_ticker="MRK"),
             event_date_review_service=_EventDateReviewStub(),
+            expected_reaction_benchmark_service=_ExpectedReactionBenchmarkStub(),
         )
 
         result = service.analyze_trial("NCT00000001")
@@ -236,6 +328,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             market_data_ingestor=_MarketStub(),
             sponsor_mapping_review_service=_SponsorReviewStub(),
             event_date_review_service=event_date_review_stub,
+            expected_reaction_benchmark_service=_ExpectedReactionBenchmarkStub(),
         )
 
         result = service.analyze_trial("NCT00000001")
@@ -275,6 +368,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             market_data_ingestor=_MarketStub(),
             sponsor_mapping_review_service=_SponsorReviewStub(),
             event_date_review_service=review_stub,
+            expected_reaction_benchmark_service=_ExpectedReactionBenchmarkStub(),
         )
 
         result = service.analyze_trial("NCT00000002")

@@ -27,6 +27,7 @@ from app.ingestion import (
 )
 from app.services.event_date_quality_service import EventDateQualityService
 from app.services.event_date_review_service import EventDateReviewService
+from app.services.event_return_benchmark_service import EventReturnBenchmarkService
 from app.services.historical_trial_event_service import HistoricalTrialEventService
 from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
@@ -48,6 +49,7 @@ class TrialAnalysisService:
         market_data_ingestor: MarketDataIngestor | None = None,
         sponsor_mapping_review_service: SponsorMappingReviewService | None = None,
         event_date_review_service: EventDateReviewService | None = None,
+        expected_reaction_benchmark_service: EventReturnBenchmarkService | None = None,
         persist_trial_records: bool = True,
     ) -> None:
         self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
@@ -58,6 +60,9 @@ class TrialAnalysisService:
             sec_mapper=self.sec_mapper
         )
         self.event_date_review_service = event_date_review_service or EventDateReviewService()
+        self.expected_reaction_benchmark_service = (
+            expected_reaction_benchmark_service or EventReturnBenchmarkService()
+        )
         self.persist_trial_records = persist_trial_records
         self.event_date_quality_service = EventDateQualityService()
         self.historical_event_service = HistoricalTrialEventService()
@@ -302,6 +307,54 @@ class TrialAnalysisService:
             warnings.append(f"OpenFDA fetch failed: {exc}")
             return [], warnings
 
+    def _build_expected_reaction_context(
+        self,
+        trial: dict[str, Any],
+        sponsor_mapping: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        cohort_filters = {
+            "is_model_ready": True,
+            "phase_label": trial.get("phase_label"),
+            "event_date_quality_tier": trial.get("event_date_quality_tier"),
+        }
+        group_by = "therapeutic_area" if trial.get("therapeutic_area") else "phase_label"
+        try:
+            benchmark = self.expected_reaction_benchmark_service.benchmark_dataset(
+                group_by=group_by,
+                limit=1000,
+                offset=0,
+                is_model_ready=cohort_filters["is_model_ready"],
+                phase_label=cohort_filters["phase_label"],
+                event_date_quality_tier=cohort_filters["event_date_quality_tier"],
+                min_group_size=5,
+            )
+        except Exception as exc:
+            return {
+                "status": "skipped",
+                "reason": "benchmark_unavailable",
+                "error": str(exc),
+                "cohort_filters": cohort_filters,
+                "profile": None,
+            }
+
+        profile = benchmark.get("expected_reaction_profile")
+        return {
+            "status": "available" if profile else "unavailable",
+            "group_by": benchmark.get("group_by"),
+            "cohort_filters": cohort_filters,
+            "mapped_ticker": None if sponsor_mapping is None else sponsor_mapping.get("ticker"),
+            "profile": profile,
+            "benchmark_summary": benchmark.get("summary"),
+            "sample_size_warnings": next(
+                (
+                    section
+                    for section in benchmark.get("summary_sections") or []
+                    if section.get("title") == "sample_size_warnings"
+                ),
+                None,
+            ),
+        }
+
     def _persist_analysis(self, trial: dict[str, Any], analysis: dict[str, Any]) -> dict[str, int] | None:
         try:
             with get_connection() as connection:
@@ -366,7 +419,19 @@ class TrialAnalysisService:
             post_days=market_post_days,
         )
         warnings.extend(market_warnings)
+        expected_reaction_context = self._build_expected_reaction_context(
+            trial=trial,
+            sponsor_mapping=sponsor_mapping,
+        )
         warnings = self._normalize_warnings(warnings)
+        summary = self._build_summary(
+            trial=trial,
+            sponsor_mapping=sponsor_mapping,
+            market_summary=market_summary,
+            approval_records=approval_records,
+        )
+        summary["expected_reaction_status"] = expected_reaction_context.get("status")
+        summary["expected_reaction_profile"] = expected_reaction_context.get("profile")
 
         analysis = {
             "status": "success",
@@ -381,12 +446,7 @@ class TrialAnalysisService:
                 "include_raw_trial": include_raw_trial,
                 "save_to_db": save_to_db,
             },
-            "summary": self._build_summary(
-                trial=trial,
-                sponsor_mapping=sponsor_mapping,
-                market_summary=market_summary,
-                approval_records=approval_records,
-            ),
+            "summary": summary,
             "event_date_quality": self._build_event_date_quality_summary(trial),
             "event_date_review": event_date_review,
             "trial": trial,
@@ -396,6 +456,7 @@ class TrialAnalysisService:
                 "approval_records": approval_records,
             },
             "market_data": market_summary,
+            "expected_reaction": expected_reaction_context,
             "warnings": warnings,
         }
         if save_to_db:
