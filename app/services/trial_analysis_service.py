@@ -402,6 +402,55 @@ class TrialAnalysisService:
         )
         return comparison
 
+    def _build_final_comparison_summary(
+        self,
+        trial: dict[str, Any],
+        expected_reaction_context: dict[str, Any],
+        market_expected_reaction_comparison: dict[str, Any],
+    ) -> dict[str, Any]:
+        event_date_tier = str(trial.get("event_date_quality_tier") or "unknown")
+        profile = expected_reaction_context.get("profile") or {}
+        comparison_status = market_expected_reaction_comparison.get("status")
+        classification = market_expected_reaction_comparison.get("classification") or "insufficient_data"
+
+        if comparison_status != "available":
+            headline = "Insufficient data to compare observed market reaction with historical expectation."
+            conclusion = "indeterminate"
+        elif classification == "aligned":
+            headline = "Observed market reaction was broadly aligned with historical expectation."
+            conclusion = "aligned"
+        elif classification == "stronger_than_expected":
+            headline = "Observed market reaction was stronger than historical expectation."
+            conclusion = "stronger_than_expected"
+        elif classification == "weaker_than_expected":
+            headline = "Observed market reaction was weaker than historical expectation."
+            conclusion = "weaker_than_expected"
+        else:
+            headline = "Observed market reaction could not be classified against historical expectation."
+            conclusion = "indeterminate"
+
+        confidence_notes = []
+        confidence_tier = profile.get("confidence_tier")
+        if confidence_tier in {"thin", "unknown", None}:
+            confidence_notes.append("Historical expected-reaction support is limited.")
+        if event_date_tier in {"low", "unknown"}:
+            confidence_notes.append("Event-date quality weakens the reliability of the comparison.")
+        if expected_reaction_context.get("sample_size_warnings"):
+            warning_metrics = (expected_reaction_context.get("sample_size_warnings") or {}).get("metrics") or {}
+            if warning_metrics.get("small_sample_group_count"):
+                confidence_notes.append("One or more benchmark cohorts are below the minimum sample-size threshold.")
+
+        return {
+            "status": "available" if comparison_status == "available" else "indeterminate",
+            "conclusion": conclusion,
+            "headline": headline,
+            "expected_direction": profile.get("expected_direction"),
+            "expected_reaction_confidence": confidence_tier,
+            "event_date_quality_tier": event_date_tier,
+            "return_gap": market_expected_reaction_comparison.get("return_gap"),
+            "confidence_notes": confidence_notes,
+        }
+
     def _persist_analysis(self, trial: dict[str, Any], analysis: dict[str, Any]) -> dict[str, int] | None:
         try:
             with get_connection() as connection:
@@ -474,6 +523,11 @@ class TrialAnalysisService:
             market_summary=market_summary,
             expected_reaction_context=expected_reaction_context,
         )
+        final_comparison_summary = self._build_final_comparison_summary(
+            trial=trial,
+            expected_reaction_context=expected_reaction_context,
+            market_expected_reaction_comparison=market_expected_reaction_comparison,
+        )
         warnings = self._normalize_warnings(warnings)
         summary = self._build_summary(
             trial=trial,
@@ -484,6 +538,7 @@ class TrialAnalysisService:
         summary["expected_reaction_status"] = expected_reaction_context.get("status")
         summary["expected_reaction_profile"] = expected_reaction_context.get("profile")
         summary["market_expected_reaction_comparison"] = market_expected_reaction_comparison
+        summary["final_comparison_summary"] = final_comparison_summary
 
         analysis = {
             "status": "success",
@@ -510,6 +565,7 @@ class TrialAnalysisService:
             "market_data": market_summary,
             "expected_reaction": expected_reaction_context,
             "market_expected_reaction_comparison": market_expected_reaction_comparison,
+            "final_comparison_summary": final_comparison_summary,
             "warnings": warnings,
         }
         if save_to_db:

@@ -253,6 +253,17 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             result["summary"]["market_expected_reaction_comparison"]["classification"],
             "stronger_than_expected",
         )
+        self.assertEqual(result["final_comparison_summary"]["status"], "available")
+        self.assertEqual(result["final_comparison_summary"]["conclusion"], "stronger_than_expected")
+        self.assertEqual(
+            result["final_comparison_summary"]["headline"],
+            "Observed market reaction was stronger than historical expectation.",
+        )
+        self.assertEqual(result["final_comparison_summary"]["expected_direction"], "positive")
+        self.assertEqual(result["final_comparison_summary"]["expected_reaction_confidence"], "moderate")
+        self.assertEqual(result["final_comparison_summary"]["event_date_quality_tier"], "high")
+        self.assertEqual(result["final_comparison_summary"]["return_gap"], 0.043)
+        self.assertEqual(result["summary"]["final_comparison_summary"]["conclusion"], "stronger_than_expected")
         self.assertEqual(
             result["expected_reaction"]["cohort_filters"],
             {
@@ -415,6 +426,14 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             "Event date was queued for manual review because the catalyst-date proxy looks weak or ambiguous."
             " review_reason=non_day_precision_event_date",
             result["warnings"],
+        )
+        self.assertEqual(
+            result["final_comparison_summary"]["headline"],
+            "Insufficient data to compare observed market reaction with historical expectation.",
+        )
+        self.assertIn(
+            "Event-date quality weakens the reliability of the comparison.",
+            result["final_comparison_summary"]["confidence_notes"],
         )
 
 

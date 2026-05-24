@@ -272,6 +272,8 @@ Single-trial analysis should attach that expected-reaction context when historic
 
 Single-trial analysis should also compare the observed event-day return against the attached expected-reaction profile when both values are available. This comparison should classify the observed reaction as aligned, stronger than expected, weaker than expected, or unavailable, making the output closer to the final market-versus-model framing without claiming a precise price target.
 
+Single-trial analysis should include a plain-language final comparison summary that names the conclusion, expected direction, confidence tier, event-date quality tier, return gap, and caveats. This is the analyst-facing bridge between raw pipeline fields and the final market-versus-model output style.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition
