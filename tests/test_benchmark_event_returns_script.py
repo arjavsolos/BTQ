@@ -41,6 +41,9 @@ class _BenchmarkServiceStub:
             "status": "success",
             "group_by": group_by,
             "summary": {"event_count": 3, "group_count": 2},
+            "summary_sections": [
+                {"title": "coverage", "metrics": {"event_count": 3}, "display_summary": "coverage"},
+            ],
             "groups": [{"group": "PHASE3", "event_count": 2}],
         }
 
@@ -74,6 +77,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         self.assertEqual(payload["status"], "success")
         self.assertEqual(payload["group_by"], "event_date_quality_tier")
         self.assertEqual(payload["summary"]["event_count"], 3)
+        self.assertEqual(payload["summary_sections"][0]["title"], "coverage")
         self.assertEqual(
             service.calls[0],
             {

@@ -79,6 +79,11 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         self.assertEqual(result["summary"]["event_count"], 3)
         self.assertEqual(result["summary"]["group_count"], 2)
         self.assertEqual(result["summary"]["average_event_day_return"], 0.046667)
+        self.assertEqual(result["summary_sections"][0]["title"], "coverage")
+        self.assertEqual(result["summary_sections"][0]["metrics"]["model_ready_count"], 2)
+        self.assertEqual(result["summary_sections"][1]["title"], "returns")
+        self.assertEqual(result["summary_sections"][2]["title"], "review_provenance")
+        self.assertEqual(result["summary_sections"][2]["metrics"]["event_date_override_applied_count"], 1)
         self.assertEqual(result["groups"][0]["group"], "PHASE3")
         self.assertEqual(result["groups"][0]["event_count"], 2)
         self.assertEqual(result["groups"][0]["model_ready_ratio"], 0.5)
@@ -109,6 +114,7 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
                     "post_window_return": 0.02,
                     "is_model_ready": True,
                     "event_date_override_applied": False,
+                    "sponsor_mapping_override_applied": True,
                 },
                 {
                     "sponsor_mapping_review_status": None,
@@ -116,6 +122,7 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
                     "post_window_return": -0.01,
                     "is_model_ready": False,
                     "event_date_override_applied": False,
+                    "sponsor_mapping_override_applied": False,
                 },
             ]
         )
@@ -125,6 +132,10 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
             group_by="sponsor_mapping_review_status",
         )
 
+        self.assertEqual(
+            result["summary_sections"][2]["metrics"]["sponsor_mapping_override_applied_count"],
+            1,
+        )
         self.assertEqual(result["groups"][0]["group"], "UNKNOWN")
         self.assertEqual(result["groups"][1]["group"], "approved")
 

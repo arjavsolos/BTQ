@@ -5,6 +5,12 @@ from typing import Any
 
 from app.database.connection import get_connection
 from app.database.repositories import HistoricalTrialEventRepository
+from app.models.benchmark_report import (
+    BenchmarkGroup,
+    BenchmarkReport,
+    BenchmarkSummary,
+    BenchmarkSummarySection,
+)
 
 
 class EventReturnBenchmarkService:
@@ -41,7 +47,7 @@ class EventReturnBenchmarkService:
             return None
         return round(float(median(values)), 6)
 
-    def _build_group_summary(self, group_value: str, events: list[dict[str, Any]]) -> dict[str, Any]:
+    def _build_group_summary(self, group_value: str, events: list[dict[str, Any]]) -> BenchmarkGroup:
         event_day_returns = [
             float(event["event_day_return"])
             for event in events
@@ -56,21 +62,83 @@ class EventReturnBenchmarkService:
         positive_event_day_count = sum(1 for value in event_day_returns if value > 0)
         override_applied_count = sum(1 for event in events if event.get("event_date_override_applied"))
 
-        return {
-            "group": group_value,
-            "event_count": len(events),
-            "model_ready_count": model_ready_count,
-            "model_ready_ratio": None if not events else round(model_ready_count / len(events), 6),
-            "event_day_return_count": len(event_day_returns),
-            "average_event_day_return": self._safe_average(event_day_returns),
-            "median_event_day_return": self._safe_median(event_day_returns),
-            "positive_event_day_ratio": (
+        return BenchmarkGroup(
+            group=group_value,
+            event_count=len(events),
+            model_ready_count=model_ready_count,
+            model_ready_ratio=None if not events else round(model_ready_count / len(events), 6),
+            event_day_return_count=len(event_day_returns),
+            average_event_day_return=self._safe_average(event_day_returns),
+            median_event_day_return=self._safe_median(event_day_returns),
+            positive_event_day_ratio=(
                 None if not event_day_returns else round(positive_event_day_count / len(event_day_returns), 6)
             ),
-            "average_post_window_return": self._safe_average(post_window_returns),
-            "median_post_window_return": self._safe_median(post_window_returns),
-            "event_date_override_applied_count": override_applied_count,
-        }
+            average_post_window_return=self._safe_average(post_window_returns),
+            median_post_window_return=self._safe_median(post_window_returns),
+            event_date_override_applied_count=override_applied_count,
+        )
+
+    def _build_summary_sections(
+        self,
+        summary: BenchmarkSummary,
+        groups: list[BenchmarkGroup],
+        events: list[dict[str, Any]],
+    ) -> list[BenchmarkSummarySection]:
+        model_ready_count = sum(1 for event in events if event.get("is_model_ready"))
+        event_date_override_count = sum(1 for event in events if event.get("event_date_override_applied"))
+        sponsor_mapping_override_count = sum(1 for event in events if event.get("sponsor_mapping_override_applied"))
+        largest_group = max(groups, key=lambda group: (group.event_count, group.group), default=None)
+
+        coverage_section = BenchmarkSummarySection(
+            title="coverage",
+            metrics={
+                "event_count": summary.event_count,
+                "group_count": summary.group_count,
+                "event_day_return_count": summary.event_day_return_count,
+                "model_ready_count": model_ready_count,
+                "model_ready_ratio": None if not events else round(model_ready_count / len(events), 6),
+            },
+            display_summary=(
+                f"Benchmarked {summary.event_count} historical events across {summary.group_count} groups, "
+                f"with usable event-day returns on {summary.event_day_return_count} rows."
+            ),
+        )
+        returns_section = BenchmarkSummarySection(
+            title="returns",
+            metrics={
+                "average_event_day_return": summary.average_event_day_return,
+                "largest_group": None if largest_group is None else largest_group.group,
+                "largest_group_average_event_day_return": (
+                    None if largest_group is None else largest_group.average_event_day_return
+                ),
+                "largest_group_median_event_day_return": (
+                    None if largest_group is None else largest_group.median_event_day_return
+                ),
+            },
+            display_summary=(
+                f"The benchmark-wide average event-day return is {summary.average_event_day_return}, "
+                f"with the largest cohort "
+                f"{'UNKNOWN' if largest_group is None else largest_group.group} contributing the deepest slice."
+            ),
+        )
+        review_section = BenchmarkSummarySection(
+            title="review_provenance",
+            metrics={
+                "event_date_override_applied_count": event_date_override_count,
+                "sponsor_mapping_override_applied_count": sponsor_mapping_override_count,
+                "event_date_override_applied_ratio": (
+                    None if not events else round(event_date_override_count / len(events), 6)
+                ),
+                "sponsor_mapping_override_applied_ratio": (
+                    None if not events else round(sponsor_mapping_override_count / len(events), 6)
+                ),
+            },
+            display_summary=(
+                f"{event_date_override_count} rows used approved event-date overrides and "
+                f"{sponsor_mapping_override_count} used sponsor-mapping overrides."
+            ),
+        )
+        return [coverage_section, returns_section, review_section]
 
     def build_benchmark_from_repository(
         self,
@@ -112,17 +180,20 @@ class EventReturnBenchmarkService:
             for event in events
             if isinstance(event.get("event_day_return"), int | float)
         ]
-        return {
-            "status": "success",
-            "group_by": resolved_group_by,
-            "summary": {
-                "event_count": len(events),
-                "group_count": len(groups),
-                "event_day_return_count": len(event_day_returns),
-                "average_event_day_return": self._safe_average(event_day_returns),
-            },
-            "groups": groups,
-        }
+        summary = BenchmarkSummary(
+            event_count=len(events),
+            group_count=len(groups),
+            event_day_return_count=len(event_day_returns),
+            average_event_day_return=self._safe_average(event_day_returns),
+        )
+        report = BenchmarkReport(
+            status="success",
+            group_by=resolved_group_by,
+            summary=summary,
+            summary_sections=self._build_summary_sections(summary, groups, events),
+            groups=groups,
+        )
+        return report.to_dict()
 
     def benchmark_dataset(
         self,

@@ -254,6 +254,8 @@ Historical event export should preserve the key event-date-quality and model-rea
 
 The project should also support grouped event-return benchmarking over the stored historical dataset so cohort-level expected-reaction summaries can be evaluated before any more advanced predictive layer is trusted.
 
+Those benchmark outputs should expose compact summary sections for coverage, return behavior, and review provenance so they can be reused in scripts, demos, and later final-comparison reports.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition
