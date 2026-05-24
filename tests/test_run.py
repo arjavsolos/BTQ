@@ -432,6 +432,7 @@ class RunParserTests(unittest.TestCase):
                 "summary": {"event_count": 3, "group_count": 2},
                 "summary_sections": [
                     {"title": "coverage", "metrics": {}, "display_summary": "coverage"},
+                    {"title": "cohort_comparisons", "metrics": {}, "display_summary": "comparisons"},
                     {"title": "top_groups", "metrics": {}, "display_summary": "top groups"},
                 ],
                 "groups": [{"group": "PHASE3", "event_count": 2}],
@@ -480,6 +481,7 @@ class RunParserTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertIn("# Event Return Benchmark", output)
+        self.assertIn("### cohort_comparisons", output)
         self.assertIn("### top_groups", output)
         self.assertIn("PHASE3", output)
         self.assertEqual(

@@ -256,6 +256,8 @@ The project should also support grouped event-return benchmarking over the store
 
 Those benchmark outputs should expose compact summary sections for coverage, return behavior, and review provenance so they can be reused in scripts, demos, and later final-comparison reports.
 
+They should also expose direct cohort-comparison summaries, especially model-ready versus incomplete rows and review-heavy versus clean rows, so benchmark reports surface whether data-quality or human-review dependence materially changes observed event behavior.
+
 They should also be exportable in machine-friendly and human-friendly forms, including structured JSON plus lightweight Markdown or line-oriented cohort output for quick review.
 
 Benchmarking should support review-aware cohort filters as well, so sponsor-reviewed rows, event-date-reviewed rows, and override-heavy subsets can be compared directly instead of only broad phase or ticker buckets.

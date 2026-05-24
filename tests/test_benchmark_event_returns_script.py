@@ -54,6 +54,11 @@ class _BenchmarkServiceStub:
             "summary_sections": [
                 {"title": "coverage", "metrics": {"event_count": 3}, "display_summary": "coverage"},
                 {
+                    "title": "cohort_comparisons",
+                    "metrics": {"model_ready_event_count": 2},
+                    "display_summary": "comparisons",
+                },
+                {
                     "title": "top_groups",
                     "metrics": {"top_positive_group": "PHASE3"},
                     "display_summary": "top groups",
@@ -98,7 +103,8 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         self.assertEqual(payload["group_by"], "sponsor_class")
         self.assertEqual(payload["summary"]["event_count"], 3)
         self.assertEqual(payload["summary_sections"][0]["title"], "coverage")
-        self.assertEqual(payload["summary_sections"][1]["title"], "top_groups")
+        self.assertEqual(payload["summary_sections"][1]["title"], "cohort_comparisons")
+        self.assertEqual(payload["summary_sections"][2]["title"], "top_groups")
         self.assertEqual(
             service.calls[0],
             {
@@ -138,6 +144,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("# Event Return Benchmark", output)
         self.assertIn("## Summary Sections", output)
+        self.assertIn("### cohort_comparisons", output)
         self.assertIn("### top_groups", output)
 
     def test_main_supports_jsonl_output(self) -> None:

@@ -49,6 +49,33 @@ class EventReturnBenchmarkService:
             return None
         return round(float(median(values)), 6)
 
+    def _has_meaningful_review_status(self, value: Any) -> bool:
+        normalized = " ".join(str(value or "").split()).strip().lower()
+        return normalized not in {"", "unknown", "unreviewed"}
+
+    def _is_review_heavy(self, event: dict[str, Any]) -> bool:
+        return bool(
+            event.get("sponsor_mapping_override_applied")
+            or event.get("event_date_override_applied")
+            or self._has_meaningful_review_status(event.get("sponsor_mapping_review_status"))
+            or self._has_meaningful_review_status(event.get("event_date_review_status"))
+        )
+
+    def _build_subset_metrics(self, events: list[dict[str, Any]]) -> dict[str, Any]:
+        event_day_returns = [
+            float(event["event_day_return"])
+            for event in events
+            if isinstance(event.get("event_day_return"), int | float)
+        ]
+        positive_return_count = sum(1 for value in event_day_returns if value > 0)
+        return {
+            "event_count": len(events),
+            "average_event_day_return": self._safe_average(event_day_returns),
+            "positive_event_day_ratio": (
+                None if not event_day_returns else round(positive_return_count / len(event_day_returns), 6)
+            ),
+        }
+
     def _build_group_summary(self, group_value: str, events: list[dict[str, Any]]) -> BenchmarkGroup:
         event_day_returns = [
             float(event["event_day_return"])
@@ -140,6 +167,54 @@ class EventReturnBenchmarkService:
                 f"{sponsor_mapping_override_count} used sponsor-mapping overrides."
             ),
         )
+        model_ready_events = [event for event in events if event.get("is_model_ready")]
+        not_model_ready_events = [event for event in events if not event.get("is_model_ready")]
+        review_heavy_events = [event for event in events if self._is_review_heavy(event)]
+        clean_events = [event for event in events if not self._is_review_heavy(event)]
+        model_ready_metrics = self._build_subset_metrics(model_ready_events)
+        not_model_ready_metrics = self._build_subset_metrics(not_model_ready_events)
+        review_heavy_metrics = self._build_subset_metrics(review_heavy_events)
+        clean_metrics = self._build_subset_metrics(clean_events)
+        comparison_section = BenchmarkSummarySection(
+            title="cohort_comparisons",
+            metrics={
+                "model_ready_event_count": model_ready_metrics["event_count"],
+                "model_ready_average_event_day_return": model_ready_metrics["average_event_day_return"],
+                "non_model_ready_event_count": not_model_ready_metrics["event_count"],
+                "non_model_ready_average_event_day_return": not_model_ready_metrics["average_event_day_return"],
+                "review_heavy_event_count": review_heavy_metrics["event_count"],
+                "review_heavy_average_event_day_return": review_heavy_metrics["average_event_day_return"],
+                "clean_event_count": clean_metrics["event_count"],
+                "clean_average_event_day_return": clean_metrics["average_event_day_return"],
+                "model_ready_minus_non_model_ready_return_gap": (
+                    None
+                    if model_ready_metrics["average_event_day_return"] is None
+                    or not_model_ready_metrics["average_event_day_return"] is None
+                    else round(
+                        model_ready_metrics["average_event_day_return"]
+                        - not_model_ready_metrics["average_event_day_return"],
+                        6,
+                    )
+                ),
+                "review_heavy_minus_clean_return_gap": (
+                    None
+                    if review_heavy_metrics["average_event_day_return"] is None
+                    or clean_metrics["average_event_day_return"] is None
+                    else round(
+                        review_heavy_metrics["average_event_day_return"]
+                        - clean_metrics["average_event_day_return"],
+                        6,
+                    )
+                ),
+            },
+            display_summary=(
+                f"Model-ready rows average "
+                f"{model_ready_metrics['average_event_day_return']} versus "
+                f"{not_model_ready_metrics['average_event_day_return']} for incomplete rows; "
+                f"review-heavy rows average {review_heavy_metrics['average_event_day_return']} "
+                f"versus {clean_metrics['average_event_day_return']} for clean rows."
+            ),
+        )
         ranked_groups = [
             group
             for group in sorted(
@@ -174,7 +249,7 @@ class EventReturnBenchmarkService:
                 f"at {None if top_negative_group is None else top_negative_group.average_event_day_return}."
             ),
         )
-        return [coverage_section, returns_section, review_section, top_groups_section]
+        return [coverage_section, returns_section, review_section, comparison_section, top_groups_section]
 
     def build_benchmark_from_repository(
         self,

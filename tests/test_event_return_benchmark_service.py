@@ -93,9 +93,10 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         self.assertEqual(result["summary_sections"][0]["metrics"]["model_ready_count"], 2)
         self.assertEqual(result["summary_sections"][1]["title"], "returns")
         self.assertEqual(result["summary_sections"][2]["title"], "review_provenance")
-        self.assertEqual(result["summary_sections"][3]["title"], "top_groups")
-        self.assertEqual(result["summary_sections"][3]["metrics"]["top_positive_group"], "PHASE3")
-        self.assertEqual(result["summary_sections"][3]["metrics"]["top_negative_group"], "PHASE2")
+        self.assertEqual(result["summary_sections"][3]["title"], "cohort_comparisons")
+        self.assertEqual(result["summary_sections"][4]["title"], "top_groups")
+        self.assertEqual(result["summary_sections"][4]["metrics"]["top_positive_group"], "PHASE3")
+        self.assertEqual(result["summary_sections"][4]["metrics"]["top_negative_group"], "PHASE2")
         self.assertEqual(result["summary_sections"][2]["metrics"]["event_date_override_applied_count"], 1)
         self.assertEqual(result["groups"][0]["group"], "PHASE3")
         self.assertEqual(result["groups"][0]["event_count"], 2)
@@ -195,6 +196,58 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         self.assertEqual(result["groups"][0]["event_count"], 2)
         self.assertEqual(result["groups"][0]["average_event_day_return"], 0.08)
         self.assertEqual(result["groups"][1]["group"], "Rare Disease")
+
+    def test_build_benchmark_adds_model_ready_and_review_heavy_comparisons(self) -> None:
+        service = EventReturnBenchmarkService()
+        repository = _BenchmarkRepositoryStub(
+            [
+                {
+                    "phase_label": "PHASE3",
+                    "event_day_return": 0.10,
+                    "post_window_return": 0.03,
+                    "is_model_ready": True,
+                    "event_date_override_applied": False,
+                    "sponsor_mapping_review_status": None,
+                    "event_date_review_status": None,
+                    "sponsor_mapping_override_applied": False,
+                },
+                {
+                    "phase_label": "PHASE2",
+                    "event_day_return": -0.02,
+                    "post_window_return": 0.00,
+                    "is_model_ready": False,
+                    "event_date_override_applied": False,
+                    "sponsor_mapping_review_status": None,
+                    "event_date_review_status": None,
+                    "sponsor_mapping_override_applied": False,
+                },
+                {
+                    "phase_label": "PHASE2",
+                    "event_day_return": 0.04,
+                    "post_window_return": 0.01,
+                    "is_model_ready": True,
+                    "event_date_override_applied": True,
+                    "sponsor_mapping_review_status": "approved",
+                    "event_date_review_status": "approved",
+                    "sponsor_mapping_override_applied": False,
+                },
+            ]
+        )
+
+        result = service.build_benchmark_from_repository(repository=repository, group_by="phase_label")
+        comparison_section = result["summary_sections"][3]
+
+        self.assertEqual(comparison_section["title"], "cohort_comparisons")
+        self.assertEqual(comparison_section["metrics"]["model_ready_event_count"], 2)
+        self.assertEqual(comparison_section["metrics"]["model_ready_average_event_day_return"], 0.07)
+        self.assertEqual(comparison_section["metrics"]["non_model_ready_event_count"], 1)
+        self.assertEqual(comparison_section["metrics"]["non_model_ready_average_event_day_return"], -0.02)
+        self.assertEqual(comparison_section["metrics"]["review_heavy_event_count"], 1)
+        self.assertEqual(comparison_section["metrics"]["review_heavy_average_event_day_return"], 0.04)
+        self.assertEqual(comparison_section["metrics"]["clean_event_count"], 2)
+        self.assertEqual(comparison_section["metrics"]["clean_average_event_day_return"], 0.04)
+        self.assertEqual(comparison_section["metrics"]["model_ready_minus_non_model_ready_return_gap"], 0.09)
+        self.assertEqual(comparison_section["metrics"]["review_heavy_minus_clean_return_gap"], 0.0)
 
     def test_build_benchmark_passes_review_provenance_filters(self) -> None:
         service = EventReturnBenchmarkService()
