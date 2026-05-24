@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts import (
+    publish_event_return_benchmark_summary,
     publish_historical_dataset_audit_summary,
     publish_historical_dataset_backfill_summary,
 )
@@ -135,6 +136,68 @@ class PublishHistoricalDatasetSummariesTests(unittest.TestCase):
             self.assertIn("Average quality score: `67.4`", summary_text)
             self.assertIn("Top source rank: `4`", summary_text)
             self.assertIn("Top confidence bucket: `high`", summary_text)
+
+    def test_benchmark_summary_includes_highlights_and_top_groups(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "benchmark.json"
+            summary_path = Path(tmpdir) / "summary.md"
+            output_path.write_text(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "group_by": "phase_label",
+                        "summary": {
+                            "event_count": 12,
+                            "group_count": 3,
+                            "event_day_return_count": 10,
+                            "average_event_day_return": 0.0412,
+                        },
+                        "summary_sections": [
+                            {
+                                "title": "coverage",
+                                "display_summary": "Benchmarked 12 historical events across 3 groups.",
+                            },
+                            {
+                                "title": "top_groups",
+                                "display_summary": "Top positive cohort: PHASE3 at 0.08.",
+                            },
+                        ],
+                        "groups": [
+                            {
+                                "group": "PHASE3",
+                                "event_count": 5,
+                                "average_event_day_return": 0.08,
+                                "median_event_day_return": 0.05,
+                            },
+                            {
+                                "group": "PHASE2",
+                                "event_count": 4,
+                                "average_event_day_return": -0.01,
+                                "median_event_day_return": -0.02,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EVENT_RETURN_BENCHMARK_OUTPUT_PATH": str(output_path),
+                    "GITHUB_STEP_SUMMARY": str(summary_path),
+                },
+                clear=False,
+            ):
+                publish_event_return_benchmark_summary.main()
+
+            summary_text = summary_path.read_text(encoding="utf-8")
+            self.assertIn("### Event Return Benchmark", summary_text)
+            self.assertIn("Grouped by: `phase_label`", summary_text)
+            self.assertIn("### Benchmark Highlights", summary_text)
+            self.assertIn("`coverage`", summary_text)
+            self.assertIn("### Top Benchmark Groups", summary_text)
+            self.assertIn("`PHASE3` | count=`5`", summary_text)
 
 
 if __name__ == "__main__":

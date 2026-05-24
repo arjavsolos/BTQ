@@ -122,6 +122,18 @@ When summary mode is enabled, the export layer also computes a lightweight QA su
 
 That makes the export more useful for operational review and dataset snapshots.
 
+### Step 6. Workflow summaries can also publish benchmark snapshots
+
+The historical dataset workflow can now run a lightweight event-return benchmark snapshot after backfill and audit.
+
+That benchmark step is intended to answer questions like:
+
+- which cohort currently has the strongest average event-day move?
+- how many stored events are usable for grouped benchmark summaries?
+- what do the largest benchmark groups look like right now?
+
+This keeps the workflow summary closer to the final BTQ goal of probability, event-risk, and expected-reaction comparison.
+
 ## What A Historical Event Export Row Contains
 
 The current export row is intentionally compact but still research-useful.
@@ -235,6 +247,12 @@ python run.py export-historical-trial-events --mapped-ticker PFE --format jsonl
 
 ```bash
 python scripts/export_historical_trial_events.py
+```
+
+### Run a benchmark snapshot through the main runner
+
+```bash
+python run.py benchmark-event-returns --group-by phase_label --format markdown
 ```
 
 ## How This Fits Into The Bigger Project

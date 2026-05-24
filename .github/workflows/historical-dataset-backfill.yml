@@ -304,12 +304,33 @@ jobs:
           printf '%s\n' "$output" > logs/historical_dataset_audit_output.json
           exit 0
 
+      - name: Run event return benchmark snapshot
+        if: always()
+        shell: bash
+        env:
+          EVENT_RETURN_BENCHMARK_GROUP_BY: phase_label
+          EVENT_RETURN_BENCHMARK_LIMIT: "250"
+          EVENT_RETURN_BENCHMARK_MODEL_READY: "true"
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+
+          printf '%s\n' "Running command: python scripts/benchmark_event_returns.py" | tee logs/event_return_benchmark.log
+          set +e
+          output="$(python scripts/benchmark_event_returns.py 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output" | tee -a logs/event_return_benchmark.log
+          printf '%s\n' "$output" > logs/event_return_benchmark_output.json
+          exit 0
+
       - name: Publish workflow summary
         if: always()
         shell: bash
         env:
           HISTORICAL_DATASET_OUTPUT_PATH: logs/historical_dataset_backfill_output.json
           HISTORICAL_AUDIT_OUTPUT_PATH: logs/historical_dataset_audit_output.json
+          EVENT_RETURN_BENCHMARK_OUTPUT_PATH: logs/event_return_benchmark_output.json
         run: |
           set -euo pipefail
 
@@ -340,4 +361,8 @@ jobs:
 
           if [ -f logs/historical_dataset_audit_output.json ]; then
             python scripts/publish_historical_dataset_audit_summary.py
+          fi
+
+          if [ -f logs/event_return_benchmark_output.json ]; then
+            python scripts/publish_event_return_benchmark_summary.py
           fi
