@@ -266,6 +266,8 @@ Benchmark grouping should also support domain-meaningful cohorts such as `therap
 
 Benchmark reports should mark cohorts below a configurable minimum group size and include a sample-size warning section, because return summaries from tiny biotech cohorts are useful for exploration but should not be treated as stable estimates.
 
+Benchmark reports should also expose a compact `expected_reaction_profile` with direction, confidence tier, event-day return summary, post-window return summary, and caveats. Later probability and market-comparison layers should consume that profile instead of reverse-engineering expected reaction from lower-level group rows.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition

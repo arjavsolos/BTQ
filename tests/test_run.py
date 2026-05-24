@@ -15,9 +15,10 @@ class _BenchmarkServiceStub:
         self.result = result or {
             "status": "success",
             "group_by": "phase_label",
-            "summary": {"event_count": 2, "group_count": 1},
-            "groups": [],
-        }
+                "summary": {"event_count": 2, "group_count": 1},
+                "expected_reaction_profile": {"expected_direction": "positive"},
+                "groups": [],
+            }
         self.calls: list[dict] = []
 
     def benchmark_dataset(
@@ -439,8 +440,10 @@ class RunParserTests(unittest.TestCase):
                     {"title": "coverage", "metrics": {}, "display_summary": "coverage"},
                     {"title": "sample_size_warnings", "metrics": {}, "display_summary": "sample warnings"},
                     {"title": "cohort_comparisons", "metrics": {}, "display_summary": "comparisons"},
+                    {"title": "expected_reaction", "metrics": {}, "display_summary": "expected reaction"},
                     {"title": "top_groups", "metrics": {}, "display_summary": "top groups"},
                 ],
+                "expected_reaction_profile": {"expected_direction": "positive"},
                 "groups": [{"group": "PHASE3", "event_count": 2}],
             }
         )
@@ -491,6 +494,7 @@ class RunParserTests(unittest.TestCase):
         self.assertIn("# Event Return Benchmark", output)
         self.assertIn("### sample_size_warnings", output)
         self.assertIn("### cohort_comparisons", output)
+        self.assertIn("### expected_reaction", output)
         self.assertIn("### top_groups", output)
         self.assertIn("PHASE3", output)
         self.assertEqual(

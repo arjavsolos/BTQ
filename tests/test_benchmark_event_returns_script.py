@@ -66,11 +66,20 @@ class _BenchmarkServiceStub:
                     "display_summary": "comparisons",
                 },
                 {
+                    "title": "expected_reaction",
+                    "metrics": {"expected_direction": "positive"},
+                    "display_summary": "expected reaction",
+                },
+                {
                     "title": "top_groups",
                     "metrics": {"top_positive_group": "PHASE3"},
                     "display_summary": "top groups",
                 },
             ],
+            "expected_reaction_profile": {
+                "expected_direction": "positive",
+                "confidence_tier": "thin",
+            },
             "groups": [{"group": "PHASE3", "event_count": 2}],
         }
 
@@ -113,6 +122,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         self.assertEqual(payload["summary_sections"][0]["title"], "coverage")
         self.assertEqual(payload["summary_sections"][1]["title"], "sample_size_warnings")
         self.assertEqual(payload["summary_sections"][2]["title"], "cohort_comparisons")
+        self.assertEqual(payload["expected_reaction_profile"]["expected_direction"], "positive")
         self.assertEqual(
             service.calls[0],
             {
@@ -155,6 +165,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         self.assertIn("## Summary Sections", output)
         self.assertIn("### sample_size_warnings", output)
         self.assertIn("### cohort_comparisons", output)
+        self.assertIn("### expected_reaction", output)
         self.assertIn("### top_groups", output)
 
     def test_main_supports_jsonl_output(self) -> None:

@@ -10,6 +10,7 @@ from app.models.benchmark_report import (
     BenchmarkReport,
     BenchmarkSummary,
     BenchmarkSummarySection,
+    ExpectedReactionProfile,
 )
 
 
@@ -122,6 +123,69 @@ class EventReturnBenchmarkService:
             average_post_window_return=self._safe_average(post_window_returns),
             median_post_window_return=self._safe_median(post_window_returns),
             event_date_override_applied_count=override_applied_count,
+        )
+
+    def _classify_expected_direction(self, average_event_day_return: float | None) -> str:
+        if average_event_day_return is None:
+            return "unknown"
+        if average_event_day_return >= 0.02:
+            return "positive"
+        if average_event_day_return <= -0.02:
+            return "negative"
+        return "mixed"
+
+    def _classify_profile_confidence(
+        self,
+        event_day_return_count: int,
+        small_sample_group_count: int,
+    ) -> str:
+        if event_day_return_count >= 100 and small_sample_group_count == 0:
+            return "strong"
+        if event_day_return_count >= 30:
+            return "moderate"
+        if event_day_return_count > 0:
+            return "thin"
+        return "unknown"
+
+    def _build_expected_reaction_profile(
+        self,
+        events: list[dict[str, Any]],
+        groups: list[BenchmarkGroup],
+    ) -> ExpectedReactionProfile:
+        event_day_returns = [
+            float(event["event_day_return"])
+            for event in events
+            if isinstance(event.get("event_day_return"), int | float)
+        ]
+        post_window_returns = [
+            float(event["post_window_return"])
+            for event in events
+            if isinstance(event.get("post_window_return"), int | float)
+        ]
+        positive_event_day_count = sum(1 for value in event_day_returns if value > 0)
+        average_event_day_return = self._safe_average(event_day_returns)
+        small_sample_group_count = sum(1 for group in groups if group.is_small_sample)
+        caveats = []
+        if not event_day_returns:
+            caveats.append("No usable event-day returns are available for this benchmark.")
+        if small_sample_group_count:
+            caveats.append(f"{small_sample_group_count} cohort(s) are below the configured minimum group size.")
+        if len(event_day_returns) < 30:
+            caveats.append("The expected reaction profile is based on fewer than 30 usable event-day returns.")
+
+        return ExpectedReactionProfile(
+            event_count=len(events),
+            event_day_return_count=len(event_day_returns),
+            average_event_day_return=average_event_day_return,
+            median_event_day_return=self._safe_median(event_day_returns),
+            positive_event_day_ratio=(
+                None if not event_day_returns else round(positive_event_day_count / len(event_day_returns), 6)
+            ),
+            average_post_window_return=self._safe_average(post_window_returns),
+            median_post_window_return=self._safe_median(post_window_returns),
+            expected_direction=self._classify_expected_direction(average_event_day_return),
+            confidence_tier=self._classify_profile_confidence(len(event_day_returns), small_sample_group_count),
+            caveats=caveats,
         )
 
     def _build_summary_sections(
@@ -280,12 +344,29 @@ class EventReturnBenchmarkService:
                 f"at {None if top_negative_group is None else top_negative_group.average_event_day_return}."
             ),
         )
+        expected_reaction_profile = self._build_expected_reaction_profile(events, groups)
+        expected_reaction_section = BenchmarkSummarySection(
+            title="expected_reaction",
+            metrics={
+                "expected_direction": expected_reaction_profile.expected_direction,
+                "confidence_tier": expected_reaction_profile.confidence_tier,
+                "average_event_day_return": expected_reaction_profile.average_event_day_return,
+                "median_event_day_return": expected_reaction_profile.median_event_day_return,
+                "positive_event_day_ratio": expected_reaction_profile.positive_event_day_ratio,
+            },
+            display_summary=(
+                f"Expected reaction is {expected_reaction_profile.expected_direction} with "
+                f"{expected_reaction_profile.confidence_tier} historical support; "
+                f"average event-day return is {expected_reaction_profile.average_event_day_return}."
+            ),
+        )
         return [
             coverage_section,
             returns_section,
             review_section,
             small_sample_section,
             comparison_section,
+            expected_reaction_section,
             top_groups_section,
         ]
 
@@ -347,10 +428,12 @@ class EventReturnBenchmarkService:
             event_day_return_count=len(event_day_returns),
             average_event_day_return=self._safe_average(event_day_returns),
         )
+        expected_reaction_profile = self._build_expected_reaction_profile(events, groups)
         report = BenchmarkReport(
             status="success",
             group_by=resolved_group_by,
             summary=summary,
+            expected_reaction_profile=expected_reaction_profile,
             summary_sections=self._build_summary_sections(summary, groups, events, resolved_min_group_size),
             groups=groups,
         )
