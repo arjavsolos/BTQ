@@ -355,6 +355,53 @@ class TrialAnalysisService:
             ),
         }
 
+    def _build_market_expected_reaction_comparison(
+        self,
+        market_summary: dict[str, Any] | None,
+        expected_reaction_context: dict[str, Any],
+    ) -> dict[str, Any]:
+        profile = expected_reaction_context.get("profile") or {}
+        actual_event_day_return = None if market_summary is None else market_summary.get("event_day_return")
+        expected_event_day_return = profile.get("average_event_day_return")
+
+        comparison = {
+            "status": "unavailable",
+            "classification": "insufficient_data",
+            "actual_event_day_return": actual_event_day_return,
+            "expected_event_day_return": expected_event_day_return,
+            "return_gap": None,
+            "expected_direction": profile.get("expected_direction"),
+            "confidence_tier": profile.get("confidence_tier"),
+            "interpretation": "Market comparison was skipped because actual or expected event-day return is missing.",
+        }
+        if not isinstance(actual_event_day_return, int | float) or not isinstance(
+            expected_event_day_return,
+            int | float,
+        ):
+            return comparison
+
+        return_gap = round(float(actual_event_day_return) - float(expected_event_day_return), 6)
+        absolute_gap = abs(return_gap)
+        if absolute_gap < 0.03:
+            classification = "aligned"
+        elif return_gap >= 0.03:
+            classification = "stronger_than_expected"
+        else:
+            classification = "weaker_than_expected"
+
+        comparison.update(
+            {
+                "status": "available",
+                "classification": classification,
+                "return_gap": return_gap,
+                "interpretation": (
+                    f"Actual event-day return was {classification.replace('_', ' ')} "
+                    f"relative to the historical expected-reaction profile."
+                ),
+            }
+        )
+        return comparison
+
     def _persist_analysis(self, trial: dict[str, Any], analysis: dict[str, Any]) -> dict[str, int] | None:
         try:
             with get_connection() as connection:
@@ -423,6 +470,10 @@ class TrialAnalysisService:
             trial=trial,
             sponsor_mapping=sponsor_mapping,
         )
+        market_expected_reaction_comparison = self._build_market_expected_reaction_comparison(
+            market_summary=market_summary,
+            expected_reaction_context=expected_reaction_context,
+        )
         warnings = self._normalize_warnings(warnings)
         summary = self._build_summary(
             trial=trial,
@@ -432,6 +483,7 @@ class TrialAnalysisService:
         )
         summary["expected_reaction_status"] = expected_reaction_context.get("status")
         summary["expected_reaction_profile"] = expected_reaction_context.get("profile")
+        summary["market_expected_reaction_comparison"] = market_expected_reaction_comparison
 
         analysis = {
             "status": "success",
@@ -457,6 +509,7 @@ class TrialAnalysisService:
             },
             "market_data": market_summary,
             "expected_reaction": expected_reaction_context,
+            "market_expected_reaction_comparison": market_expected_reaction_comparison,
             "warnings": warnings,
         }
         if save_to_db:

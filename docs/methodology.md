@@ -270,6 +270,8 @@ Benchmark reports should also expose a compact `expected_reaction_profile` with 
 
 Single-trial analysis should attach that expected-reaction context when historical benchmarks are available, preserving both the full benchmark context and a compact summary-level profile for report and API consumers.
 
+Single-trial analysis should also compare the observed event-day return against the attached expected-reaction profile when both values are available. This comparison should classify the observed reaction as aligned, stronger than expected, weaker than expected, or unavailable, making the output closer to the final market-versus-model framing without claiming a precise price target.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition

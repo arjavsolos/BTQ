@@ -241,6 +241,18 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["summary"]["expected_reaction_status"], "available")
         self.assertEqual(result["summary"]["expected_reaction_profile"]["average_event_day_return"], 0.08)
         self.assertEqual(result["expected_reaction"]["benchmark_summary"]["event_count"], 30)
+        self.assertEqual(result["market_expected_reaction_comparison"]["status"], "available")
+        self.assertEqual(
+            result["market_expected_reaction_comparison"]["classification"],
+            "stronger_than_expected",
+        )
+        self.assertEqual(result["market_expected_reaction_comparison"]["actual_event_day_return"], 0.123)
+        self.assertEqual(result["market_expected_reaction_comparison"]["expected_event_day_return"], 0.08)
+        self.assertEqual(result["market_expected_reaction_comparison"]["return_gap"], 0.043)
+        self.assertEqual(
+            result["summary"]["market_expected_reaction_comparison"]["classification"],
+            "stronger_than_expected",
+        )
         self.assertEqual(
             result["expected_reaction"]["cohort_filters"],
             {
