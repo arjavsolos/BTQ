@@ -72,7 +72,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
             patch.dict(
                 os.environ,
                 {
-                    "EVENT_RETURN_BENCHMARK_GROUP_BY": "event_date_quality_tier",
+                    "EVENT_RETURN_BENCHMARK_GROUP_BY": "sponsor_class",
                     "EVENT_RETURN_BENCHMARK_LIMIT": "250",
                     "EVENT_RETURN_BENCHMARK_OFFSET": "10",
                     "EVENT_RETURN_BENCHMARK_MODEL_READY": "true",
@@ -95,14 +95,14 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
 
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["status"], "success")
-        self.assertEqual(payload["group_by"], "event_date_quality_tier")
+        self.assertEqual(payload["group_by"], "sponsor_class")
         self.assertEqual(payload["summary"]["event_count"], 3)
         self.assertEqual(payload["summary_sections"][0]["title"], "coverage")
         self.assertEqual(payload["summary_sections"][1]["title"], "top_groups")
         self.assertEqual(
             service.calls[0],
             {
-                "group_by": "event_date_quality_tier",
+                "group_by": "sponsor_class",
                 "limit": 250,
                 "offset": 10,
                 "is_model_ready": True,

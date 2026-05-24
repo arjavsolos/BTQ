@@ -157,6 +157,45 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         self.assertEqual(result["groups"][0]["group"], "UNKNOWN")
         self.assertEqual(result["groups"][1]["group"], "approved")
 
+    def test_build_benchmark_supports_therapeutic_area_grouping(self) -> None:
+        service = EventReturnBenchmarkService()
+        repository = _BenchmarkRepositoryStub(
+            [
+                {
+                    "therapeutic_area": "Oncology",
+                    "event_day_return": 0.18,
+                    "post_window_return": 0.07,
+                    "is_model_ready": True,
+                    "event_date_override_applied": False,
+                },
+                {
+                    "therapeutic_area": "Oncology",
+                    "event_day_return": -0.02,
+                    "post_window_return": -0.01,
+                    "is_model_ready": True,
+                    "event_date_override_applied": False,
+                },
+                {
+                    "therapeutic_area": "Rare Disease",
+                    "event_day_return": 0.03,
+                    "post_window_return": 0.01,
+                    "is_model_ready": False,
+                    "event_date_override_applied": False,
+                },
+            ]
+        )
+
+        result = service.build_benchmark_from_repository(
+            repository=repository,
+            group_by="therapeutic_area",
+        )
+
+        self.assertEqual(result["group_by"], "therapeutic_area")
+        self.assertEqual(result["groups"][0]["group"], "Oncology")
+        self.assertEqual(result["groups"][0]["event_count"], 2)
+        self.assertEqual(result["groups"][0]["average_event_day_return"], 0.08)
+        self.assertEqual(result["groups"][1]["group"], "Rare Disease")
+
     def test_build_benchmark_passes_review_provenance_filters(self) -> None:
         service = EventReturnBenchmarkService()
         repository = _BenchmarkRepositoryStub([])
@@ -195,7 +234,7 @@ class EventReturnBenchmarkServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.build_benchmark_from_repository(
                 repository=_BenchmarkRepositoryStub([]),
-                group_by="therapeutic_area",
+                group_by="unknown_group",
             )
 
 

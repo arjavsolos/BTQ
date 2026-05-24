@@ -260,6 +260,8 @@ They should also be exportable in machine-friendly and human-friendly forms, inc
 
 Benchmarking should support review-aware cohort filters as well, so sponsor-reviewed rows, event-date-reviewed rows, and override-heavy subsets can be compared directly instead of only broad phase or ticker buckets.
 
+Benchmark grouping should also support domain-meaningful cohorts such as `therapeutic_area` and `sponsor_class`, so expected-reaction summaries can be sliced along biotech-relevant lines instead of only generic workflow fields.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition

@@ -252,7 +252,7 @@ class RunParserTests(unittest.TestCase):
             [
                 "benchmark-event-returns",
                 "--group-by",
-                "event_date_quality_tier",
+                "therapeutic_area",
                 "--limit",
                 "250",
                 "--offset",
@@ -280,7 +280,7 @@ class RunParserTests(unittest.TestCase):
         )
 
         self.assertEqual(args.command, "benchmark-event-returns")
-        self.assertEqual(args.group_by, "event_date_quality_tier")
+        self.assertEqual(args.group_by, "therapeutic_area")
         self.assertEqual(args.limit, 250)
         self.assertEqual(args.offset, 10)
         self.assertTrue(args.is_model_ready)
@@ -428,7 +428,7 @@ class RunParserTests(unittest.TestCase):
         service = _BenchmarkServiceStub(
             result={
                 "status": "success",
-                "group_by": "phase_label",
+                "group_by": "sponsor_class",
                 "summary": {"event_count": 3, "group_count": 2},
                 "summary_sections": [
                     {"title": "coverage", "metrics": {}, "display_summary": "coverage"},
@@ -447,7 +447,7 @@ class RunParserTests(unittest.TestCase):
                     "run.py",
                     "benchmark-event-returns",
                     "--group-by",
-                    "phase_label",
+                    "sponsor_class",
                     "--limit",
                     "250",
                     "--offset",
@@ -485,7 +485,7 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(
             service.calls[0],
             {
-                "group_by": "phase_label",
+                "group_by": "sponsor_class",
                 "limit": 250,
                 "offset": 10,
                 "is_model_ready": True,

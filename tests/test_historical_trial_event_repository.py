@@ -53,7 +53,9 @@ class HistoricalTrialEventRepositoryTests(unittest.TestCase):
                     "NCT00000001",
                     "NCT00000001",
                     "Pfizer Inc.",
+                    "industry",
                     "PHASE 3",
+                    "Oncology",
                     "PFE",
                     "2025-01-15",
                     "primary_completion_date",
@@ -93,6 +95,8 @@ class HistoricalTrialEventRepositoryTests(unittest.TestCase):
 
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["event_id"], 11)
+        self.assertEqual(events[0]["sponsor_class"], "industry")
+        self.assertEqual(events[0]["therapeutic_area"], "Oncology")
         self.assertEqual(events[0]["mapped_ticker"], "PFE")
         self.assertEqual(events[0]["event_date_quality_score"], 91)
         self.assertEqual(events[0]["sponsor_mapping_review_status"], "approved")

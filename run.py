@@ -211,6 +211,8 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[
             "phase_label",
             "mapped_ticker",
+            "sponsor_class",
+            "therapeutic_area",
             "event_date_quality_tier",
             "sponsor_mapping_review_status",
             "event_date_review_status",
