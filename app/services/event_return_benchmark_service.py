@@ -138,7 +138,41 @@ class EventReturnBenchmarkService:
                 f"{sponsor_mapping_override_count} used sponsor-mapping overrides."
             ),
         )
-        return [coverage_section, returns_section, review_section]
+        ranked_groups = [
+            group
+            for group in sorted(
+                groups,
+                key=lambda group: (
+                    -999999 if group.average_event_day_return is None else -group.average_event_day_return,
+                    group.group,
+                ),
+            )
+            if group.average_event_day_return is not None
+        ]
+        top_positive_group = ranked_groups[0] if ranked_groups else None
+        top_negative_group = ranked_groups[-1] if ranked_groups else None
+        top_groups_section = BenchmarkSummarySection(
+            title="top_groups",
+            metrics={
+                "top_positive_group": None if top_positive_group is None else top_positive_group.group,
+                "top_positive_average_event_day_return": (
+                    None if top_positive_group is None else top_positive_group.average_event_day_return
+                ),
+                "top_negative_group": None if top_negative_group is None else top_negative_group.group,
+                "top_negative_average_event_day_return": (
+                    None if top_negative_group is None else top_negative_group.average_event_day_return
+                ),
+            },
+            display_summary=(
+                f"Top positive cohort: "
+                f"{'UNKNOWN' if top_positive_group is None else top_positive_group.group} "
+                f"at {None if top_positive_group is None else top_positive_group.average_event_day_return}; "
+                f"top negative cohort: "
+                f"{'UNKNOWN' if top_negative_group is None else top_negative_group.group} "
+                f"at {None if top_negative_group is None else top_negative_group.average_event_day_return}."
+            ),
+        )
+        return [coverage_section, returns_section, review_section, top_groups_section]
 
     def build_benchmark_from_repository(
         self,

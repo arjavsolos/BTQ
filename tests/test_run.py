@@ -256,6 +256,8 @@ class RunParserTests(unittest.TestCase):
                 "high",
                 "--min-event-date-quality-score",
                 "80",
+                "--format",
+                "markdown",
             ]
         )
 
@@ -268,6 +270,7 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(args.phase, "PHASE 3")
         self.assertEqual(args.event_date_quality_tier, "high")
         self.assertEqual(args.min_event_date_quality_score, 80)
+        self.assertEqual(args.format, "markdown")
 
     def test_main_exports_historical_events_with_summary(self) -> None:
         repository = _HistoricalEventRepositoryStub(
@@ -404,6 +407,10 @@ class RunParserTests(unittest.TestCase):
                 "status": "success",
                 "group_by": "phase_label",
                 "summary": {"event_count": 3, "group_count": 2},
+                "summary_sections": [
+                    {"title": "coverage", "metrics": {}, "display_summary": "coverage"},
+                    {"title": "top_groups", "metrics": {}, "display_summary": "top groups"},
+                ],
                 "groups": [{"group": "PHASE3", "event_count": 2}],
             }
         )
@@ -431,6 +438,8 @@ class RunParserTests(unittest.TestCase):
                     "high",
                     "--min-event-date-quality-score",
                     "80",
+                    "--format",
+                    "markdown",
                 ],
             ),
             patch("run.EventReturnBenchmarkService", return_value=service),
@@ -438,10 +447,10 @@ class RunParserTests(unittest.TestCase):
         ):
             run.main()
 
-        payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["status"], "success")
-        self.assertEqual(payload["summary"]["event_count"], 3)
-        self.assertEqual(payload["groups"][0]["group"], "PHASE3")
+        output = stdout.getvalue()
+        self.assertIn("# Event Return Benchmark", output)
+        self.assertIn("### top_groups", output)
+        self.assertIn("PHASE3", output)
         self.assertEqual(
             service.calls[0],
             {

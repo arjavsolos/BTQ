@@ -39,6 +39,45 @@ def _get_optional_bool_env(name: str) -> bool | None:
     raise ValueError(f"Environment variable {name} must be a boolean-like value, got: {value!r}")
 
 
+def _get_format_env(name: str, default: str = "json") -> str:
+    value = _get_str_env(name)
+    if value is None:
+        return default
+    normalized = value.lower()
+    if normalized not in {"json", "jsonl", "markdown"}:
+        raise ValueError(f"Environment variable {name} must be one of: json, jsonl, markdown. Got: {value!r}")
+    return normalized
+
+
+def _render_markdown(report: dict) -> str:
+    lines = [
+        "# Event Return Benchmark",
+        "",
+        f"- `group_by`: {report.get('group_by')}",
+        f"- `event_count`: {(report.get('summary') or {}).get('event_count')}",
+        f"- `group_count`: {(report.get('summary') or {}).get('group_count')}",
+        "",
+        "## Summary Sections",
+    ]
+    for section in report.get("summary_sections") or []:
+        lines.extend(
+            [
+                "",
+                f"### {section.get('title')}",
+                "",
+                str(section.get("display_summary") or ""),
+            ]
+        )
+    lines.extend(["", "## Groups"])
+    for group in report.get("groups") or []:
+        lines.append(
+            f"- `{group.get('group')}`: count={group.get('event_count')}, "
+            f"avg_event_day_return={group.get('average_event_day_return')}, "
+            f"median_event_day_return={group.get('median_event_day_return')}"
+        )
+    return "\n".join(lines)
+
+
 def main() -> None:
     service = EventReturnBenchmarkService()
     result = service.benchmark_dataset(
@@ -55,6 +94,14 @@ def main() -> None:
             else None
         ),
     )
+    output_format = _get_format_env("EVENT_RETURN_BENCHMARK_FORMAT", "json")
+    if output_format == "jsonl":
+        for group in result.get("groups") or []:
+            print(json.dumps(group, ensure_ascii=True))
+        return
+    if output_format == "markdown":
+        print(_render_markdown(result))
+        return
     print(json.dumps(result, indent=2, ensure_ascii=True))
 
 

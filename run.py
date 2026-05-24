@@ -84,6 +84,35 @@ def _build_event_date_review_export_summary(reviews: list[dict[str, Any]]) -> di
     }
 
 
+def _render_benchmark_markdown(report: dict[str, Any]) -> str:
+    lines = [
+        "# Event Return Benchmark",
+        "",
+        f"- `group_by`: {report.get('group_by')}",
+        f"- `event_count`: {(report.get('summary') or {}).get('event_count')}",
+        f"- `group_count`: {(report.get('summary') or {}).get('group_count')}",
+        "",
+        "## Summary Sections",
+    ]
+    for section in report.get("summary_sections") or []:
+        lines.extend(
+            [
+                "",
+                f"### {section.get('title')}",
+                "",
+                str(section.get("display_summary") or ""),
+            ]
+        )
+    lines.extend(["", "## Groups"])
+    for group in report.get("groups") or []:
+        lines.append(
+            f"- `{group.get('group')}`: count={group.get('event_count')}, "
+            f"avg_event_day_return={group.get('average_event_day_return')}, "
+            f"median_event_day_return={group.get('median_event_day_return')}"
+        )
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="BTQ project runner")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -195,6 +224,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_event_returns.add_argument("--phase")
     benchmark_event_returns.add_argument("--event-date-quality-tier")
     benchmark_event_returns.add_argument("--min-event-date-quality-score", type=int)
+    benchmark_event_returns.add_argument("--format", choices=["json", "jsonl", "markdown"], default="json")
     return parser
 
 
@@ -390,6 +420,13 @@ def main() -> None:
             event_date_quality_tier=args.event_date_quality_tier,
             min_event_date_quality_score=args.min_event_date_quality_score,
         )
+        if args.format == "jsonl":
+            for group in result.get("groups") or []:
+                print(json.dumps(group, ensure_ascii=True))
+            return
+        if args.format == "markdown":
+            print(_render_benchmark_markdown(result))
+            return
         print(json.dumps(result, indent=2, ensure_ascii=True))
         return
 

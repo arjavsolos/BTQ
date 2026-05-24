@@ -256,6 +256,8 @@ The project should also support grouped event-return benchmarking over the store
 
 Those benchmark outputs should expose compact summary sections for coverage, return behavior, and review provenance so they can be reused in scripts, demos, and later final-comparison reports.
 
+They should also be exportable in machine-friendly and human-friendly forms, including structured JSON plus lightweight Markdown or line-oriented cohort output for quick review.
+
 This lets you evaluate the dataset as a measurable artifact instead of assuming the pipeline is trustworthy just because it runs.
 
 ## Model-Ready Definition

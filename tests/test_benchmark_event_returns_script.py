@@ -43,6 +43,11 @@ class _BenchmarkServiceStub:
             "summary": {"event_count": 3, "group_count": 2},
             "summary_sections": [
                 {"title": "coverage", "metrics": {"event_count": 3}, "display_summary": "coverage"},
+                {
+                    "title": "top_groups",
+                    "metrics": {"top_positive_group": "PHASE3"},
+                    "display_summary": "top groups",
+                },
             ],
             "groups": [{"group": "PHASE3", "event_count": 2}],
         }
@@ -78,6 +83,7 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
         self.assertEqual(payload["group_by"], "event_date_quality_tier")
         self.assertEqual(payload["summary"]["event_count"], 3)
         self.assertEqual(payload["summary_sections"][0]["title"], "coverage")
+        self.assertEqual(payload["summary_sections"][1]["title"], "top_groups")
         self.assertEqual(
             service.calls[0],
             {
@@ -91,6 +97,49 @@ class BenchmarkEventReturnsScriptTests(unittest.TestCase):
                 "min_event_date_quality_score": 80,
             },
         )
+
+    def test_main_supports_markdown_output(self) -> None:
+        service = _BenchmarkServiceStub()
+        stdout = io.StringIO()
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "EVENT_RETURN_BENCHMARK_FORMAT": "markdown",
+                },
+                clear=False,
+            ),
+            patch("scripts.benchmark_event_returns.EventReturnBenchmarkService", return_value=service),
+            redirect_stdout(stdout),
+        ):
+            benchmark_event_returns.main()
+
+        output = stdout.getvalue()
+        self.assertIn("# Event Return Benchmark", output)
+        self.assertIn("## Summary Sections", output)
+        self.assertIn("### top_groups", output)
+
+    def test_main_supports_jsonl_output(self) -> None:
+        service = _BenchmarkServiceStub()
+        stdout = io.StringIO()
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "EVENT_RETURN_BENCHMARK_FORMAT": "jsonl",
+                },
+                clear=False,
+            ),
+            patch("scripts.benchmark_event_returns.EventReturnBenchmarkService", return_value=service),
+            redirect_stdout(stdout),
+        ):
+            benchmark_event_returns.main()
+
+        lines = [line for line in stdout.getvalue().splitlines() if line.strip()]
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(json.loads(lines[0])["group"], "PHASE3")
 
 
 if __name__ == "__main__":
