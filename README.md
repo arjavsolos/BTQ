@@ -2,6 +2,23 @@
 
 BTQ is a biotech event intelligence platform that turns public clinical-trial, regulatory, and market data into an auditable historical catalyst dataset for probability, event-risk, and expected-reaction analysis.
 
+## Quick Start
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+python -m pip install -r requirements.txt
+.\venv\Scripts\python.exe run.py check-readiness --skip-db
+```
+
+For shared multi-computer usage, point `.env` at `NEON_DATABASE_URL` and use:
+
+```bash
+.\venv\Scripts\python.exe run.py sync-hosted-database --apply
+```
+
+See [docs/setup_on_new_computer.md](docs/setup_on_new_computer.md) for the clean hosted setup path.
+
 The project is being built toward a final system that:
 
 - constructs an auditable historical dataset of clinical trial catalysts

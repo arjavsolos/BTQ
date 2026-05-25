@@ -177,6 +177,30 @@ class _DemoDatasetPublisherServiceStub:
         }
 
 
+class _DatabaseSyncServiceStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def sync_full_dataset(
+        self,
+        source_database_url: str | None = None,
+        target_database_url: str | None = None,
+        dry_run: bool = True,
+    ) -> dict:
+        self.calls.append(
+            {
+                "source_database_url": source_database_url,
+                "target_database_url": target_database_url,
+                "dry_run": dry_run,
+            }
+        )
+        return {
+            "status": "dry_run" if dry_run else "success",
+            "source_counts": {"clinical_trials": 10},
+            "target_counts": {} if dry_run else {"clinical_trials": 10},
+        }
+
+
 class _TrialAnalysisServiceStub:
     def __init__(self) -> None:
         self.calls: list[dict] = []
@@ -335,6 +359,25 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(args.offset, 5)
         self.assertEqual(args.event_date_quality_tier, "moderate")
         self.assertEqual(args.min_event_date_quality_score, 70)
+        self.assertTrue(args.apply)
+
+    def test_build_parser_supports_hosted_database_sync_command(self) -> None:
+        parser = run.build_parser()
+
+        args = parser.parse_args(
+            [
+                "sync-hosted-database",
+                "--source-database-url",
+                "postgresql://local",
+                "--target-database-url",
+                "postgresql://demo",
+                "--apply",
+            ]
+        )
+
+        self.assertEqual(args.command, "sync-hosted-database")
+        self.assertEqual(args.source_database_url, "postgresql://local")
+        self.assertEqual(args.target_database_url, "postgresql://demo")
         self.assertTrue(args.apply)
 
     def test_build_parser_supports_sponsor_mapping_review_export_command(self) -> None:
@@ -562,6 +605,28 @@ class RunParserTests(unittest.TestCase):
                 "dry_run": True,
                 "event_date_quality_tier": "high",
                 "min_event_date_quality_score": 80,
+            },
+        )
+
+    def test_main_runs_hosted_database_sync_in_dry_run_mode(self) -> None:
+        service = _DatabaseSyncServiceStub()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(sys, "argv", ["run.py", "sync-hosted-database"]),
+            patch("run.DatabaseSyncService", return_value=service),
+            redirect_stdout(stdout),
+        ):
+            run.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "dry_run")
+        self.assertEqual(
+            service.calls[0],
+            {
+                "source_database_url": None,
+                "target_database_url": None,
+                "dry_run": True,
             },
         )
 

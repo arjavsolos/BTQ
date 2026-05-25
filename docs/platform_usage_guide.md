@@ -69,6 +69,15 @@ python run.py publish-demo-dataset
 
 This runs as a dry run by default. Add `--apply` only when you want to push the curated subset to the hosted demo database.
 
+### 6. Sync the full dataset to Neon
+
+```bash
+python run.py sync-hosted-database
+python run.py sync-hosted-database --apply
+```
+
+Use this when you want another computer to see the same full BTQ dataset.
+
 ## How To Read The Final Report
 
 ### Modeled Success Probability

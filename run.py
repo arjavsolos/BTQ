@@ -26,6 +26,7 @@ from app.research import (
     render_trial_analysis_markdown,
 )
 from app.services import (
+    DatabaseSyncService,
     DemoDatasetPublisherService,
     EventReturnBenchmarkService,
     HistoricalDatasetAuditService,
@@ -155,6 +156,14 @@ def build_parser() -> argparse.ArgumentParser:
     publish_demo_dataset.add_argument("--event-date-quality-tier", default="high")
     publish_demo_dataset.add_argument("--min-event-date-quality-score", type=int, default=80)
     publish_demo_dataset.add_argument("--apply", action="store_true")
+
+    sync_hosted_database = subparsers.add_parser(
+        "sync-hosted-database",
+        help="Copy the full BTQ dataset from the source database to the hosted/demo database",
+    )
+    sync_hosted_database.add_argument("--source-database-url")
+    sync_hosted_database.add_argument("--target-database-url")
+    sync_hosted_database.add_argument("--apply", action="store_true")
 
     analyze = subparsers.add_parser("analyze-trial", help="Run end-to-end analysis for one NCT ID")
     analyze.add_argument("nct_id")
@@ -306,6 +315,16 @@ def main() -> None:
             dry_run=not args.apply,
             event_date_quality_tier=args.event_date_quality_tier,
             min_event_date_quality_score=args.min_event_date_quality_score,
+        )
+        print(json.dumps(result, indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "sync-hosted-database":
+        service = DatabaseSyncService()
+        result = service.sync_full_dataset(
+            source_database_url=args.source_database_url,
+            target_database_url=args.target_database_url,
+            dry_run=not args.apply,
         )
         print(json.dumps(result, indent=2, ensure_ascii=True))
         return
