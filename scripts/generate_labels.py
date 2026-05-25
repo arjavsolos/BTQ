@@ -1,1 +1,0 @@
-"""Future label generation entrypoint."""
