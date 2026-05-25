@@ -218,6 +218,15 @@ class _TrialAnalysisServiceStub:
                 "phase_label": "PHASE3",
                 "therapeutic_area": "Oncology",
                 "event_date_candidate": "2025-01-15",
+                "modeled_success_probability": {
+                    "model_version": "baseline-logistic-v1",
+                    "probability_percent": 71.2,
+                    "probability_tier": "favorable",
+                },
+                "bayesian_probability": {
+                    "posterior_probability_percent": 68.4,
+                    "confidence_tier": "moderate",
+                },
                 "final_comparison_summary": final_summary,
             },
             "event_date_quality": {

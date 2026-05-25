@@ -7,6 +7,7 @@ from app.services import ReadinessService, TrialAnalysisService
 
 FINAL_COMPARISON_FIELDS = {
     "analysis_readiness",
+    "bayesian_probability",
     "expected_reaction_status",
     "expected_reaction_profile",
     "market_expected_reaction_comparison",

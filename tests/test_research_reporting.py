@@ -57,6 +57,10 @@ class ResearchReportingTests(unittest.TestCase):
                     "probability_percent": 71.2,
                     "probability_tier": "favorable",
                 },
+                "bayesian_probability": {
+                    "posterior_probability_percent": 68.4,
+                    "confidence_tier": "moderate",
+                },
                 "warnings": [],
             }
         )
@@ -70,6 +74,8 @@ class ResearchReportingTests(unittest.TestCase):
         self.assertIn("**Readiness score:** `96`", markdown)
         self.assertIn("## Modeled Success Probability", markdown)
         self.assertIn("**Success probability:** `71.2`", markdown)
+        self.assertIn("**Bayesian posterior:** `68.4`", markdown)
+        self.assertIn("**Bayesian confidence:** `moderate`", markdown)
         self.assertIn("**Quality tier:** `high`", markdown)
 
 

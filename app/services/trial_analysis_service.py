@@ -29,6 +29,7 @@ from app.services.event_date_quality_service import EventDateQualityService
 from app.services.event_date_review_service import EventDateReviewService
 from app.services.event_return_benchmark_service import EventReturnBenchmarkService
 from app.services.baseline_model_service import BaselineModelService
+from app.services.bayesian_probability_service import BayesianProbabilityService
 from app.services.historical_trial_event_service import HistoricalTrialEventService
 from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
@@ -52,6 +53,7 @@ class TrialAnalysisService:
         event_date_review_service: EventDateReviewService | None = None,
         expected_reaction_benchmark_service: EventReturnBenchmarkService | None = None,
         baseline_model_service: BaselineModelService | None = None,
+        bayesian_probability_service: BayesianProbabilityService | None = None,
         persist_trial_records: bool = True,
     ) -> None:
         self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
@@ -66,6 +68,7 @@ class TrialAnalysisService:
             expected_reaction_benchmark_service or EventReturnBenchmarkService()
         )
         self.baseline_model_service = baseline_model_service or BaselineModelService()
+        self.bayesian_probability_service = bayesian_probability_service or BayesianProbabilityService()
         self.persist_trial_records = persist_trial_records
         self.event_date_quality_service = EventDateQualityService()
         self.historical_event_service = HistoricalTrialEventService()
@@ -605,6 +608,17 @@ class TrialAnalysisService:
             trial=trial,
             sponsor_mapping=sponsor_mapping,
         )
+        bayesian_probability = self.bayesian_probability_service.update_probability(
+            baseline_probability=baseline_probability.get("success_probability", 0.5),
+            trial=trial,
+            sponsor_mapping=sponsor_mapping,
+            expected_reaction_context=expected_reaction_context,
+        )
+        if bayesian_probability.get("warnings"):
+            warnings.append(
+                "Bayesian probability update returned warnings: "
+                + ", ".join(bayesian_probability.get("warnings") or [])
+            )
         market_expected_reaction_comparison = self._build_market_expected_reaction_comparison(
             market_summary=market_summary,
             expected_reaction_context=expected_reaction_context,
@@ -624,6 +638,7 @@ class TrialAnalysisService:
         summary["expected_reaction_status"] = expected_reaction_context.get("status")
         summary["expected_reaction_profile"] = expected_reaction_context.get("profile")
         summary["modeled_success_probability"] = baseline_probability
+        summary["bayesian_probability"] = bayesian_probability
         summary["market_expected_reaction_comparison"] = market_expected_reaction_comparison
         summary["final_comparison_summary"] = final_comparison_summary
 
@@ -644,6 +659,7 @@ class TrialAnalysisService:
             "event_date_quality": self._build_event_date_quality_summary(trial),
             "event_date_review": event_date_review,
             "modeled_success_probability": baseline_probability,
+            "bayesian_probability": bayesian_probability,
             "trial": trial,
             "sponsor_mapping": sponsor_mapping,
             "fda_context": {

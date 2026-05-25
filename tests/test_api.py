@@ -42,6 +42,11 @@ class _TrialAnalysisServiceStub:
                     "blockers": [],
                     "cautions": [],
                 },
+                "bayesian_probability": {
+                    "status": "available",
+                    "posterior_probability_percent": 68.4,
+                    "confidence_tier": "moderate",
+                },
                 "expected_reaction_status": "available",
                 "expected_reaction_profile": {
                     "expected_direction": "positive",
@@ -111,6 +116,7 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(response["status"], "success")
         self.assertEqual(response["request"]["nct_id"], "NCT00000001")
         self.assertEqual(response["summary"]["analysis_readiness"]["status"], "production_ready")
+        self.assertEqual(response["summary"]["bayesian_probability"]["posterior_probability_percent"], 68.4)
         self.assertEqual(response["summary"]["expected_reaction_status"], "available")
         self.assertEqual(response["summary"]["expected_reaction_profile"]["expected_direction"], "positive")
         self.assertEqual(

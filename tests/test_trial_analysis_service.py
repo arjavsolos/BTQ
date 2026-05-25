@@ -196,8 +196,41 @@ class _ExpectedReactionBenchmarkStub:
         }
 
 
+class _BayesianProbabilityStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def update_probability(
+        self,
+        baseline_probability: float,
+        trial: dict,
+        sponsor_mapping: dict | None = None,
+        expected_reaction_context: dict | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "baseline_probability": baseline_probability,
+                "trial": dict(trial),
+                "sponsor_mapping": sponsor_mapping,
+                "expected_reaction_context": expected_reaction_context,
+            }
+        )
+        return {
+            "status": "available",
+            "model_version": "bayesian-log-odds-v1",
+            "prior_probability": baseline_probability,
+            "posterior_probability": 0.684,
+            "posterior_probability_percent": 68.4,
+            "probability_delta": round(0.684 - baseline_probability, 4),
+            "confidence_tier": "moderate",
+            "evidence": [{"name": "phase_score", "direction": "positive"}],
+            "warnings": [],
+        }
+
+
 class TrialAnalysisServiceTests(unittest.TestCase):
     def test_analyze_trial_returns_joined_output(self) -> None:
+        bayesian_stub = _BayesianProbabilityStub()
         service = TrialAnalysisService(
             clinical_trials_ingestor=_ClinicalStub(),
             sec_mapper=_SecStub(),
@@ -206,6 +239,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             sponsor_mapping_review_service=_SponsorReviewStub(),
             event_date_review_service=_EventDateReviewStub(),
             expected_reaction_benchmark_service=_ExpectedReactionBenchmarkStub(),
+            bayesian_probability_service=bayesian_stub,
         )
 
         result = service.analyze_trial("NCT00000001")
@@ -220,6 +254,12 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["summary"]["modeled_success_probability"]["status"], "available")
         self.assertGreater(result["summary"]["modeled_success_probability"]["success_probability"], 0.6)
         self.assertEqual(result["modeled_success_probability"]["probability_tier"], "favorable")
+        self.assertEqual(result["summary"]["bayesian_probability"]["posterior_probability_percent"], 68.4)
+        self.assertEqual(result["bayesian_probability"]["confidence_tier"], "moderate")
+        self.assertEqual(
+            bayesian_stub.calls[0]["baseline_probability"],
+            result["modeled_success_probability"]["success_probability"],
+        )
         self.assertEqual(result["event_date_quality"]["quality_tier"], "high")
         self.assertFalse(result["event_date_review"]["queued"])
         self.assertEqual(result["fda_context"]["approval_record_count"], 1)

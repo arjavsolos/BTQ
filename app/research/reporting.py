@@ -35,6 +35,7 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         or summary.get("modeled_success_probability")
         or {}
     )
+    bayesian_probability = analysis.get("bayesian_probability") or summary.get("bayesian_probability") or {}
     event_date_quality = analysis.get("event_date_quality") or summary.get("event_date_quality") or {}
     analysis_readiness = analysis.get("analysis_readiness") or summary.get("analysis_readiness") or {}
     warnings = analysis.get("warnings") or []
@@ -64,6 +65,8 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         _bullet("Model", modeled_probability.get("model_version")),
         _bullet("Success probability", modeled_probability.get("probability_percent")),
         _bullet("Probability tier", modeled_probability.get("probability_tier")),
+        _bullet("Bayesian posterior", bayesian_probability.get("posterior_probability_percent")),
+        _bullet("Bayesian confidence", bayesian_probability.get("confidence_tier")),
         "",
         "## Trial",
         "",
