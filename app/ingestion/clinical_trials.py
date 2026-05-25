@@ -13,6 +13,7 @@ from app.services.event_date_quality_service import EVENT_DATE_SOURCE_RANKS, Eve
 API_BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
 SOURCE_SYSTEM = "clinicaltrials.gov"
 SOURCE_API_VERSION = "v2"
+NCT_ID_PATTERN = re.compile(r"^NCT\d{8}$", re.IGNORECASE)
 
 PHASE_ORDER = {
     "EARLY_PHASE1": 0,
@@ -140,6 +141,12 @@ class ClinicalTrialsIngestor:
 
     def _normalize_text(self, value: str | None) -> str:
         return re.sub(r"\s+", " ", (value or "").strip()).lower()
+
+    def _normalize_nct_id(self, nct_id: str) -> str:
+        normalized = nct_id.strip().upper()
+        if not NCT_ID_PATTERN.fullmatch(normalized):
+            raise ValueError(f"Invalid NCT ID '{nct_id}'. Expected format like NCT01234567.")
+        return normalized
 
     def _normalize_list(self, values: list[Any] | None) -> list[Any]:
         return values or []
@@ -477,7 +484,8 @@ class ClinicalTrialsIngestor:
         nct_id: str,
         include_raw: bool = False,
     ) -> dict[str, Any]:
-        url = f"{self.base_url}/{nct_id}"
+        normalized_nct_id = self._normalize_nct_id(nct_id)
+        url = f"{self.base_url}/{normalized_nct_id}"
         try:
             payload = self._get_json(url)
         except requests.HTTPError as exc:
@@ -488,7 +496,7 @@ class ClinicalTrialsIngestor:
         except requests.RequestException as exc:
             raise RuntimeError(f"ClinicalTrials.gov request failed: {exc}") from exc
 
-        return self.extract_trial_record(payload, requested_nct_id=nct_id, include_raw=include_raw)
+        return self.extract_trial_record(payload, requested_nct_id=normalized_nct_id, include_raw=include_raw)
 
     def build_search_params(self, query: TrialQuery) -> dict[str, Any]:
         params: dict[str, Any] = {"pageSize": max(1, min(query.page_size, 1000))}

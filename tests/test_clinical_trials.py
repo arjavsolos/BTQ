@@ -150,6 +150,37 @@ class ClinicalTrialsIngestorTests(unittest.TestCase):
         self.assertEqual(record["event_date_source"], "primary_completion_date")
         self.assertEqual(record["event_date_source_rank"], 4)
 
+    def test_fetch_trial_data_normalizes_nct_id_before_request(self) -> None:
+        ingestor = ClinicalTrialsIngestor()
+        calls: list[dict] = []
+
+        def fake_get_json(url, params=None):
+            calls.append({"url": url, "params": params})
+            return {
+                "protocolSection": {
+                    "identificationModule": {"nctId": "NCT00000001"},
+                    "statusModule": {"primaryCompletionDateStruct": {"date": "2025-01-15"}},
+                }
+            }
+
+        ingestor._get_json = fake_get_json
+
+        record = ingestor.fetch_trial_data(" nct00000001 ")
+
+        self.assertEqual(calls[0]["url"], "https://clinicaltrials.gov/api/v2/studies/NCT00000001")
+        self.assertEqual(record["requested_nct_id"], "NCT00000001")
+
+    def test_fetch_trial_data_rejects_invalid_nct_id_before_request(self) -> None:
+        ingestor = ClinicalTrialsIngestor()
+
+        def fake_get_json(url, params=None):
+            raise AssertionError("network request should not be attempted for invalid NCT IDs")
+
+        ingestor._get_json = fake_get_json
+
+        with self.assertRaisesRegex(ValueError, "Invalid NCT ID"):
+            ingestor.fetch_trial_data("bad-id")
+
 
 if __name__ == "__main__":
     unittest.main()
