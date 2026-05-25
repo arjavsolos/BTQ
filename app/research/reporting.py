@@ -37,6 +37,7 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
     )
     bayesian_probability = analysis.get("bayesian_probability") or summary.get("bayesian_probability") or {}
     event_risk_simulation = analysis.get("event_risk_simulation") or summary.get("event_risk_simulation") or {}
+    market_view_comparison = analysis.get("market_view_comparison") or summary.get("market_view_comparison") or {}
     event_date_quality = analysis.get("event_date_quality") or summary.get("event_date_quality") or {}
     analysis_readiness = analysis.get("analysis_readiness") or summary.get("analysis_readiness") or {}
     warnings = analysis.get("warnings") or []
@@ -84,6 +85,15 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
                 for item in event_risk_simulation.get("scenario_table") or []
             ),
         ),
+        "",
+        "## Market View Comparison",
+        "",
+        _bullet("Comparison status", market_view_comparison.get("status")),
+        _bullet("Classification", market_view_comparison.get("classification")),
+        _bullet("Modeled move", market_view_comparison.get("modeled_move_percent")),
+        _bullet("Market move proxy", market_view_comparison.get("market_expected_move_percent")),
+        _bullet("Move gap", market_view_comparison.get("move_gap")),
+        _bullet("Signal", market_view_comparison.get("probability_adjusted_signal")),
         "",
         "## Trial",
         "",

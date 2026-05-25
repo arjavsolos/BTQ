@@ -37,9 +37,17 @@ class ResearchReportingTests(unittest.TestCase):
                     "actual_event_day_return": 0.123,
                     "expected_event_day_return": 0.08,
                 },
+                "market_view_comparison": {
+                    "status": "available",
+                    "classification": "market_underpricing_event_risk",
+                    "modeled_move_percent": 0.111,
+                    "market_expected_move_percent": 0.037,
+                    "move_gap": 0.074,
+                    "probability_adjusted_signal": "bullish_if_directionally_correct",
+                },
                 "final_comparison_summary": {
-                    "headline": "Observed market reaction was stronger than historical expectation.",
-                    "conclusion": "stronger_than_expected",
+                    "headline": "Modeled event risk looks wider than the current market move proxy.",
+                    "conclusion": "potentially_underpriced",
                     "expected_direction": "positive",
                     "expected_reaction_confidence": "moderate",
                     "event_date_quality_tier": "high",
@@ -79,7 +87,7 @@ class ResearchReportingTests(unittest.TestCase):
         )
 
         self.assertIn("# Trial Analysis Report", markdown)
-        self.assertIn("Observed market reaction was stronger than historical expectation.", markdown)
+        self.assertIn("Modeled event risk looks wider than the current market move proxy.", markdown)
         self.assertIn("**Mapped ticker:** `PFE`", markdown)
         self.assertIn("**Classification:** `stronger_than_expected`", markdown)
         self.assertIn("## Production Readiness", markdown)
@@ -92,6 +100,8 @@ class ResearchReportingTests(unittest.TestCase):
         self.assertIn("## Monte Carlo Event Risk", markdown)
         self.assertIn("**Simulation count:** `5000`", markdown)
         self.assertIn("**Downside probability:** `0.31`", markdown)
+        self.assertIn("## Market View Comparison", markdown)
+        self.assertIn("**Signal:** `bullish_if_directionally_correct`", markdown)
         self.assertIn("**Quality tier:** `high`", markdown)
 
 

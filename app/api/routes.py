@@ -11,6 +11,7 @@ FINAL_COMPARISON_FIELDS = {
     "event_risk_simulation",
     "expected_reaction_status",
     "expected_reaction_profile",
+    "market_view_comparison",
     "market_expected_reaction_comparison",
     "final_comparison_summary",
 }

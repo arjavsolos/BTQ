@@ -86,6 +86,14 @@ class _MarketStub:
             "record_count": 10,
             "event_day_return": 0.123,
             "post_window_return": 0.045,
+            "records": [
+                {"trade_date": "2025-01-09", "close": 41.2},
+                {"trade_date": "2025-01-10", "close": 41.0},
+                {"trade_date": "2025-01-13", "close": 41.4},
+                {"trade_date": "2025-01-14", "close": 40.8},
+                {"trade_date": "2025-01-15", "close": 45.8},
+                {"trade_date": "2025-01-16", "close": 45.1},
+            ],
         }
 
 
@@ -259,6 +267,7 @@ class _MonteCarloRiskStub:
             "expected_event_day_return": 0.071,
             "expected_post_window_return": 0.028,
             "downside_probability": 0.31,
+            "event_day_percentiles": {"p10": -0.051, "p50": 0.066, "p90": 0.171},
             "scenario_table": [
                 {"scenario": "bear", "event_day_return": -0.051},
                 {"scenario": "base", "event_day_return": 0.066},
@@ -268,10 +277,40 @@ class _MonteCarloRiskStub:
         }
 
 
+class _MarketViewComparisonStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def compare_market_view(
+        self,
+        trial: dict,
+        event_risk_simulation: dict | None = None,
+        bayesian_probability: dict | None = None,
+        market_summary: dict | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "trial": dict(trial),
+                "event_risk_simulation": event_risk_simulation,
+                "bayesian_probability": bayesian_probability,
+                "market_summary": market_summary,
+            }
+        )
+        return {
+            "status": "available",
+            "classification": "market_underpricing_event_risk",
+            "modeled_move_percent": 0.111,
+            "market_expected_move_percent": 0.037,
+            "move_gap": 0.074,
+            "probability_adjusted_signal": "bullish_if_directionally_correct",
+        }
+
+
 class TrialAnalysisServiceTests(unittest.TestCase):
     def test_analyze_trial_returns_joined_output(self) -> None:
         bayesian_stub = _BayesianProbabilityStub()
         monte_carlo_stub = _MonteCarloRiskStub()
+        market_view_stub = _MarketViewComparisonStub()
         service = TrialAnalysisService(
             clinical_trials_ingestor=_ClinicalStub(),
             sec_mapper=_SecStub(),
@@ -281,6 +320,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             event_date_review_service=_EventDateReviewStub(),
             expected_reaction_benchmark_service=_ExpectedReactionBenchmarkStub(),
             bayesian_probability_service=bayesian_stub,
+            market_view_comparison_service=market_view_stub,
             monte_carlo_risk_service=monte_carlo_stub,
         )
 
@@ -299,6 +339,10 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["summary"]["bayesian_probability"]["posterior_probability_percent"], 68.4)
         self.assertEqual(result["summary"]["event_risk_simulation"]["expected_event_day_return"], 0.071)
         self.assertEqual(result["event_risk_simulation"]["downside_probability"], 0.31)
+        self.assertEqual(
+            result["summary"]["market_view_comparison"]["classification"],
+            "market_underpricing_event_risk",
+        )
         self.assertEqual(result["bayesian_probability"]["confidence_tier"], "moderate")
         self.assertEqual(
             bayesian_stub.calls[0]["baseline_probability"],
@@ -307,6 +351,10 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(
             monte_carlo_stub.calls[0]["bayesian_probability"]["posterior_probability"],
             0.684,
+        )
+        self.assertEqual(
+            market_view_stub.calls[0]["event_risk_simulation"]["expected_event_day_return"],
+            0.071,
         )
         self.assertEqual(result["event_date_quality"]["quality_tier"], "high")
         self.assertFalse(result["event_date_review"]["queued"])
@@ -353,16 +401,19 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             "stronger_than_expected",
         )
         self.assertEqual(result["final_comparison_summary"]["status"], "available")
-        self.assertEqual(result["final_comparison_summary"]["conclusion"], "stronger_than_expected")
+        self.assertEqual(result["final_comparison_summary"]["conclusion"], "potentially_underpriced")
         self.assertEqual(
             result["final_comparison_summary"]["headline"],
-            "Observed market reaction was stronger than historical expectation.",
+            "Modeled event risk looks wider than the current market move proxy.",
         )
         self.assertEqual(result["final_comparison_summary"]["expected_direction"], "positive")
         self.assertEqual(result["final_comparison_summary"]["expected_reaction_confidence"], "moderate")
         self.assertEqual(result["final_comparison_summary"]["event_date_quality_tier"], "high")
         self.assertEqual(result["final_comparison_summary"]["return_gap"], 0.043)
-        self.assertEqual(result["summary"]["final_comparison_summary"]["conclusion"], "stronger_than_expected")
+        self.assertEqual(
+            result["summary"]["final_comparison_summary"]["market_view_classification"],
+            "market_underpricing_event_risk",
+        )
         self.assertEqual(
             result["expected_reaction"]["cohort_filters"],
             {

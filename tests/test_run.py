@@ -201,8 +201,8 @@ class _TrialAnalysisServiceStub:
             }
         )
         final_summary = {
-            "headline": "Observed market reaction was stronger than historical expectation.",
-            "conclusion": "stronger_than_expected",
+            "headline": "Modeled event risk looks wider than the current market move proxy.",
+            "conclusion": "potentially_underpriced",
             "expected_direction": "positive",
             "expected_reaction_confidence": "moderate",
             "event_date_quality_tier": "high",
@@ -239,6 +239,14 @@ class _TrialAnalysisServiceStub:
                         {"scenario": "base", "event_day_return": 0.066},
                         {"scenario": "bull", "event_day_return": 0.171},
                     ],
+                },
+                "market_view_comparison": {
+                    "status": "available",
+                    "classification": "market_underpricing_event_risk",
+                    "modeled_move_percent": 0.111,
+                    "market_expected_move_percent": 0.037,
+                    "move_gap": 0.074,
+                    "probability_adjusted_signal": "bullish_if_directionally_correct",
                 },
                 "analysis_readiness": {
                     "status": "production_ready",
@@ -569,6 +577,7 @@ class RunParserTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("# BTQ Project Status", output)
         self.assertIn("modeled_success_probability", output)
+        self.assertIn("market_view_comparison", output)
         self.assertIn("## Demo Commands", output)
 
     def test_main_renders_trial_analysis_markdown_report(self) -> None:
@@ -601,7 +610,7 @@ class RunParserTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertIn("# Trial Analysis Report", output)
-        self.assertIn("Observed market reaction was stronger than historical expectation.", output)
+        self.assertIn("Modeled event risk looks wider than the current market move proxy.", output)
         self.assertIn("**Mapped ticker:** `PFE`", output)
         self.assertEqual(
             service.calls[0],
@@ -647,7 +656,7 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(payload["output_path"], str(output_path))
         self.assertGreater(payload["bytes_written"], 100)
         self.assertIn("# Trial Analysis Report", written_report)
-        self.assertIn("Observed market reaction was stronger than historical expectation.", written_report)
+        self.assertIn("Modeled event risk looks wider than the current market move proxy.", written_report)
         self.assertEqual(service.calls[0]["nct_id"], "NCT00000001")
 
     def test_main_exports_historical_events_with_summary(self) -> None:

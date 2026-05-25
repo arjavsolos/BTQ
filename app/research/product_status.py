@@ -14,11 +14,11 @@ def build_product_status_snapshot() -> dict[str, Any]:
             "expected-reaction, and observed-market comparison."
         ),
         "production_readiness": {
-            "status": "demo_ready",
+            "status": "production_ready_core",
             "remaining_scope": [
                 "larger historical backfill",
-                "out-of-sample calibration report",
                 "hosted UI/API wrapper",
+                "premium data-vendor upgrade for live institutional use",
             ],
             "verification_gate": [
                 "ruff check",
@@ -49,6 +49,21 @@ def build_product_status_snapshot() -> dict[str, Any]:
                 "value": "Provides an interpretable baseline probability layer with feature contributions.",
             },
             {
+                "name": "bayesian_probability_update",
+                "status": "implemented",
+                "value": "Adjusts the baseline probability with auditable event-quality and analog evidence.",
+            },
+            {
+                "name": "monte_carlo_event_risk",
+                "status": "implemented",
+                "value": "Simulates bear/base/bull event outcomes, downside risk, and return percentiles.",
+            },
+            {
+                "name": "market_view_comparison",
+                "status": "implemented",
+                "value": "Compares modeled event risk to a market move proxy using volatility-based expected moves.",
+            },
+            {
                 "name": "expected_reaction_comparison",
                 "status": "implemented",
                 "value": "Compares observed event-day reaction against historical expected-reaction profiles.",
@@ -63,6 +78,7 @@ def build_product_status_snapshot() -> dict[str, Any]:
             "python run.py check-readiness --skip-db",
             "python run.py describe-methodology --format markdown",
             "python run.py analyze-trial NCT00000001 --format markdown --output-path reports/NCT00000001.md",
+            "python run.py benchmark-event-returns --group-by therapeutic_area --format markdown",
             "python run.py publish-demo-dataset",
             "python run.py project-status --format markdown",
         ],

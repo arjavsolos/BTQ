@@ -31,6 +31,7 @@ from app.services.event_return_benchmark_service import EventReturnBenchmarkServ
 from app.services.baseline_model_service import BaselineModelService
 from app.services.bayesian_probability_service import BayesianProbabilityService
 from app.services.historical_trial_event_service import HistoricalTrialEventService
+from app.services.market_view_comparison_service import MarketViewComparisonService
 from app.services.monte_carlo_risk_service import MonteCarloRiskService
 from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
@@ -55,6 +56,7 @@ class TrialAnalysisService:
         expected_reaction_benchmark_service: EventReturnBenchmarkService | None = None,
         baseline_model_service: BaselineModelService | None = None,
         bayesian_probability_service: BayesianProbabilityService | None = None,
+        market_view_comparison_service: MarketViewComparisonService | None = None,
         monte_carlo_risk_service: MonteCarloRiskService | None = None,
         persist_trial_records: bool = True,
     ) -> None:
@@ -71,6 +73,7 @@ class TrialAnalysisService:
         )
         self.baseline_model_service = baseline_model_service or BaselineModelService()
         self.bayesian_probability_service = bayesian_probability_service or BayesianProbabilityService()
+        self.market_view_comparison_service = market_view_comparison_service or MarketViewComparisonService()
         self.monte_carlo_risk_service = monte_carlo_risk_service or MonteCarloRiskService()
         self.persist_trial_records = persist_trial_records
         self.event_date_quality_service = EventDateQualityService()
@@ -416,13 +419,25 @@ class TrialAnalysisService:
         trial: dict[str, Any],
         expected_reaction_context: dict[str, Any],
         market_expected_reaction_comparison: dict[str, Any],
+        market_view_comparison: dict[str, Any],
     ) -> dict[str, Any]:
         event_date_tier = str(trial.get("event_date_quality_tier") or "unknown")
         profile = expected_reaction_context.get("profile") or {}
         comparison_status = market_expected_reaction_comparison.get("status")
         classification = market_expected_reaction_comparison.get("classification") or "insufficient_data"
+        market_view_status = market_view_comparison.get("status")
+        market_view_classification = market_view_comparison.get("classification") or "insufficient_data"
 
-        if comparison_status != "available":
+        if market_view_status == "available" and market_view_classification == "market_underpricing_event_risk":
+            headline = "Modeled event risk looks wider than the current market move proxy."
+            conclusion = "potentially_underpriced"
+        elif market_view_status == "available" and market_view_classification == "market_overpricing_event_risk":
+            headline = "Current market move proxy looks richer than the modeled event-risk view."
+            conclusion = "potentially_overpriced"
+        elif market_view_status == "available" and market_view_classification == "aligned":
+            headline = "Modeled event risk is broadly aligned with the current market move proxy."
+            conclusion = "aligned"
+        elif comparison_status != "available":
             headline = "Insufficient data to compare observed market reaction with historical expectation."
             conclusion = "indeterminate"
         elif classification == "aligned":
@@ -448,15 +463,23 @@ class TrialAnalysisService:
             warning_metrics = (expected_reaction_context.get("sample_size_warnings") or {}).get("metrics") or {}
             if warning_metrics.get("small_sample_group_count"):
                 confidence_notes.append("One or more benchmark cohorts are below the minimum sample-size threshold.")
+        if market_view_status != "available":
+            confidence_notes.append("Market move proxy is unavailable, so pricing classification is less complete.")
 
         return {
-            "status": "available" if comparison_status == "available" else "indeterminate",
+            "status": (
+                "available"
+                if comparison_status == "available" or market_view_status == "available"
+                else "indeterminate"
+            ),
             "conclusion": conclusion,
             "headline": headline,
             "expected_direction": profile.get("expected_direction"),
             "expected_reaction_confidence": confidence_tier,
             "event_date_quality_tier": event_date_tier,
             "return_gap": market_expected_reaction_comparison.get("return_gap"),
+            "market_view_classification": market_view_classification if market_view_status == "available" else None,
+            "market_view_move_gap": market_view_comparison.get("move_gap"),
             "confidence_notes": confidence_notes,
         }
 
@@ -638,10 +661,22 @@ class TrialAnalysisService:
                 "Monte Carlo event-risk simulation returned warnings: "
                 + ", ".join(event_risk_simulation.get("warnings") or [])
             )
+        market_view_comparison = self.market_view_comparison_service.compare_market_view(
+            trial=trial,
+            event_risk_simulation=event_risk_simulation,
+            bayesian_probability=bayesian_probability,
+            market_summary=market_summary,
+        )
+        if market_view_comparison.get("warnings"):
+            warnings.append(
+                "Market-view comparison returned warnings: "
+                + ", ".join(market_view_comparison.get("warnings") or [])
+            )
         final_comparison_summary = self._build_final_comparison_summary(
             trial=trial,
             expected_reaction_context=expected_reaction_context,
             market_expected_reaction_comparison=market_expected_reaction_comparison,
+            market_view_comparison=market_view_comparison,
         )
         warnings = self._normalize_warnings(warnings)
         summary = self._build_summary(
@@ -655,6 +690,7 @@ class TrialAnalysisService:
         summary["modeled_success_probability"] = baseline_probability
         summary["bayesian_probability"] = bayesian_probability
         summary["event_risk_simulation"] = event_risk_simulation
+        summary["market_view_comparison"] = market_view_comparison
         summary["market_expected_reaction_comparison"] = market_expected_reaction_comparison
         summary["final_comparison_summary"] = final_comparison_summary
 
@@ -677,6 +713,7 @@ class TrialAnalysisService:
             "modeled_success_probability": baseline_probability,
             "bayesian_probability": bayesian_probability,
             "event_risk_simulation": event_risk_simulation,
+            "market_view_comparison": market_view_comparison,
             "trial": trial,
             "sponsor_mapping": sponsor_mapping,
             "fda_context": {

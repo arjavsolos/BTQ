@@ -16,8 +16,11 @@ class ProductStatusTests(unittest.TestCase):
         capability_names = {item["name"] for item in snapshot["core_capabilities"]}
 
         self.assertEqual(snapshot["status_version"], PRODUCT_STATUS_VERSION)
-        self.assertEqual(snapshot["production_readiness"]["status"], "demo_ready")
+        self.assertEqual(snapshot["production_readiness"]["status"], "production_ready_core")
         self.assertIn("modeled_success_probability", capability_names)
+        self.assertIn("bayesian_probability_update", capability_names)
+        self.assertIn("monte_carlo_event_risk", capability_names)
+        self.assertIn("market_view_comparison", capability_names)
         self.assertIn("expected_reaction_comparison", capability_names)
         self.assertIn("production_readiness_scoring", capability_names)
         self.assertIn("python run.py project-status --format markdown", snapshot["demo_commands"])
@@ -27,7 +30,7 @@ class ProductStatusTests(unittest.TestCase):
 
         self.assertIn("# BTQ Project Status", markdown)
         self.assertIn("## Production Readiness", markdown)
-        self.assertIn("`demo_ready`", markdown)
+        self.assertIn("`production_ready_core`", markdown)
         self.assertIn("## Core Capabilities", markdown)
         self.assertIn("modeled_success_probability", markdown)
         self.assertIn("## Demo Commands", markdown)

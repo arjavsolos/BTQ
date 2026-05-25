@@ -29,8 +29,8 @@ class _TrialAnalysisServiceStub:
             }
         )
         final_summary = {
-            "conclusion": "stronger_than_expected",
-            "headline": "Observed market reaction was stronger than historical expectation.",
+            "conclusion": "potentially_underpriced",
+            "headline": "Modeled event risk looks wider than the current market move proxy.",
         }
         return {
             "status": "success",
@@ -53,6 +53,13 @@ class _TrialAnalysisServiceStub:
                     "probability_source": "bayesian_posterior",
                     "expected_event_day_return": 0.071,
                     "downside_probability": 0.31,
+                },
+                "market_view_comparison": {
+                    "status": "available",
+                    "classification": "market_underpricing_event_risk",
+                    "modeled_move_percent": 0.111,
+                    "market_expected_move_percent": 0.037,
+                    "move_gap": 0.074,
                 },
                 "expected_reaction_status": "available",
                 "expected_reaction_profile": {
@@ -125,6 +132,10 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(response["summary"]["analysis_readiness"]["status"], "production_ready")
         self.assertEqual(response["summary"]["bayesian_probability"]["posterior_probability_percent"], 68.4)
         self.assertEqual(response["summary"]["event_risk_simulation"]["simulation_count"], 5000)
+        self.assertEqual(
+            response["summary"]["market_view_comparison"]["classification"],
+            "market_underpricing_event_risk",
+        )
         self.assertEqual(response["summary"]["expected_reaction_status"], "available")
         self.assertEqual(response["summary"]["expected_reaction_profile"]["expected_direction"], "positive")
         self.assertEqual(
@@ -133,7 +144,7 @@ class ApiRouteTests(unittest.TestCase):
         )
         self.assertEqual(
             response["summary"]["final_comparison_summary"]["headline"],
-            "Observed market reaction was stronger than historical expectation.",
+            "Modeled event risk looks wider than the current market move proxy.",
         )
         self.assertEqual(
             service.calls[0],
