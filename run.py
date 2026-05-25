@@ -23,6 +23,7 @@ from app.services import (
     EventReturnBenchmarkService,
     HistoricalDatasetAuditService,
     HistoricalDatasetBackfillService,
+    ReadinessService,
     TrialAnalysisService,
 )
 
@@ -118,6 +119,12 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("init-db", help="Initialize database tables")
+
+    readiness = subparsers.add_parser(
+        "check-readiness",
+        help="Check whether the local environment and database are ready",
+    )
+    readiness.add_argument("--skip-db", action="store_true")
 
     analyze = subparsers.add_parser("analyze-trial", help="Run end-to-end analysis for one NCT ID")
     analyze.add_argument("nct_id")
@@ -244,6 +251,12 @@ def main() -> None:
     if args.command == "init-db":
         initialize_database()
         print(json.dumps({"status": "success", "message": "Database initialized."}, indent=2))
+        return
+
+    if args.command == "check-readiness":
+        service = ReadinessService()
+        result = service.check_readiness(include_database=not args.skip_db)
+        print(json.dumps(result, indent=2, ensure_ascii=True))
         return
 
     if args.command == "analyze-trial":

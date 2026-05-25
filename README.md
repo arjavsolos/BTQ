@@ -24,3 +24,17 @@ The canonical project definition lives in:
 - `docs/final_product_definition.md`
 - `docs/methodology.md`
 - `app/research/methodology.py`
+
+## Readiness Check
+
+Before running backfills or analysis workflows, verify the local environment:
+
+```bash
+python run.py check-readiness
+```
+
+For a quick dependency and configuration check without opening a database connection:
+
+```bash
+python run.py check-readiness --skip-db
+```

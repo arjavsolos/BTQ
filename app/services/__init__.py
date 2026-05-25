@@ -10,6 +10,7 @@ __all__ = [
     "HistoricalDatasetAuditService",
     "HistoricalDatasetBackfillService",
     "HistoricalTrialEventService",
+    "ReadinessService",
     "SponsorMappingReviewService",
     "TrialAnalysisService",
 ]
@@ -21,6 +22,7 @@ _SERVICE_MODULES = {
     "HistoricalDatasetAuditService": "app.services.historical_dataset_audit_service",
     "HistoricalDatasetBackfillService": "app.services.historical_dataset_backfill_service",
     "HistoricalTrialEventService": "app.services.historical_trial_event_service",
+    "ReadinessService": "app.services.readiness_service",
     "SponsorMappingReviewService": "app.services.sponsor_mapping_review_service",
     "TrialAnalysisService": "app.services.trial_analysis_service",
 }

@@ -129,6 +129,20 @@ class _ConnectionStub:
         return None
 
 
+class _ReadinessServiceStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def check_readiness(self, include_database: bool = True) -> dict:
+        self.calls.append({"include_database": include_database})
+        return {
+            "status": "ok",
+            "checks": {
+                "database": {"status": "skipped" if not include_database else "ok"},
+            },
+        }
+
+
 class _TrialAnalysisServiceStub:
     def __init__(self) -> None:
         self.calls: list[dict] = []
@@ -197,6 +211,14 @@ class _TrialAnalysisServiceStub:
 
 
 class RunParserTests(unittest.TestCase):
+    def test_build_parser_supports_readiness_command(self) -> None:
+        parser = run.build_parser()
+
+        args = parser.parse_args(["check-readiness", "--skip-db"])
+
+        self.assertEqual(args.command, "check-readiness")
+        self.assertTrue(args.skip_db)
+
     def test_build_parser_supports_sponsor_mapping_review_export_command(self) -> None:
         parser = run.build_parser()
 
@@ -367,6 +389,22 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(args.min_event_date_quality_score, 80)
         self.assertEqual(args.min_group_size, 3)
         self.assertEqual(args.format, "markdown")
+
+    def test_main_runs_readiness_check(self) -> None:
+        service = _ReadinessServiceStub()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(sys, "argv", ["run.py", "check-readiness", "--skip-db"]),
+            patch("run.ReadinessService", return_value=service),
+            redirect_stdout(stdout),
+        ):
+            run.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["checks"]["database"]["status"], "skipped")
+        self.assertEqual(service.calls[0], {"include_database": False})
 
     def test_main_renders_trial_analysis_markdown_report(self) -> None:
         service = _TrialAnalysisServiceStub()
