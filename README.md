@@ -41,6 +41,8 @@ python run.py check-readiness --skip-db
 
 The API registry also exposes a lightweight health route that runs the same fast readiness check without touching the database by default.
 
+Set `BTQ_DEPLOYMENT_PROFILE` to `local`, `demo`, or `ci` so readiness checks validate the right environment requirements for the run.
+
 ## Demo Publishing
 
 Preview the curated model-ready subset that would be published to a hosted demo database:

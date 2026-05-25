@@ -23,6 +23,7 @@ class ReadinessService:
         "psycopg": "psycopg",
         "dotenv": "python-dotenv",
     }
+    DEPLOYMENT_PROFILES = {"local", "demo", "ci"}
 
     def _mask_database_url(self, database_url: str) -> str:
         if "://" not in database_url or "@" not in database_url:
@@ -91,6 +92,36 @@ class ReadinessService:
             "missing": sorted(set(missing)),
         }
 
+    def _check_deployment_profile(self) -> dict[str, Any]:
+        profile = (os.getenv("BTQ_DEPLOYMENT_PROFILE") or "local").strip().lower()
+        if profile not in self.DEPLOYMENT_PROFILES:
+            return {
+                "status": "error",
+                "profile": profile,
+                "allowed_profiles": sorted(self.DEPLOYMENT_PROFILES),
+                "missing": [],
+                "message": "BTQ_DEPLOYMENT_PROFILE must be one of local, demo, or ci.",
+            }
+
+        required_by_profile = {
+            "local": [],
+            "demo": ["NEON_DATABASE_URL", "DEMO_PUBLISH_TARGET_DATABASE_URL"],
+            "ci": ["CI"],
+        }
+        missing = [
+            name
+            for name in required_by_profile[profile]
+            if not (os.getenv(name) or "").strip()
+        ]
+        return {
+            "status": "ok" if not missing else "warning",
+            "profile": profile,
+            "missing": missing,
+            "message": "Deployment profile requirements are satisfied."
+            if not missing
+            else "Deployment profile is missing recommended variables.",
+        }
+
     def _check_database(self, include_database: bool) -> dict[str, Any]:
         if not include_database:
             return {
@@ -109,11 +140,13 @@ class ReadinessService:
         python_check = self._check_python()
         package_check = self._check_packages()
         environment_check = self._check_environment()
+        deployment_profile_check = self._check_deployment_profile()
         database_check = self._check_database(include_database)
         section_statuses = [
             python_check["status"],
             package_check["status"],
             environment_check["status"],
+            deployment_profile_check["status"],
             database_check["status"],
         ]
         if "error" in section_statuses:
@@ -129,6 +162,7 @@ class ReadinessService:
                 "python": python_check,
                 "packages": package_check,
                 "environment": environment_check,
+                "deployment_profile": deployment_profile_check,
                 "database": database_check,
             },
         }

@@ -24,6 +24,8 @@ class ReadinessServiceTests(unittest.TestCase):
 
         self.assertEqual(result["checks"]["database"]["status"], "skipped")
         self.assertEqual(result["checks"]["environment"]["status"], "ok")
+        self.assertEqual(result["checks"]["deployment_profile"]["status"], "ok")
+        self.assertEqual(result["checks"]["deployment_profile"]["profile"], "local")
         self.assertEqual(
             result["checks"]["environment"]["database_url"],
             "postgresql://***:***@localhost:5432/btq",
@@ -74,6 +76,50 @@ class ReadinessServiceTests(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertEqual(result["checks"]["database"]["status"], "error")
         self.assertEqual(result["checks"]["database"]["error"], "database unavailable")
+
+    def test_check_readiness_warns_when_demo_profile_missing_demo_database_config(self) -> None:
+        service = ReadinessService()
+
+        with patch.dict(
+            "os.environ",
+            {
+                "BTQ_DEPLOYMENT_PROFILE": "demo",
+                "DATABASE_TARGET": "local",
+                "LOCAL_DATABASE_URL": "postgresql://postgres:secret@localhost:5432/btq",
+                "SEC_CONTACT_NAME": "BTQ Research",
+                "SEC_CONTACT_EMAIL": "you@example.com",
+            },
+            clear=True,
+        ):
+            result = service.check_readiness(include_database=False)
+
+        self.assertEqual(result["status"], "warning")
+        self.assertEqual(result["checks"]["deployment_profile"]["status"], "warning")
+        self.assertEqual(result["checks"]["deployment_profile"]["profile"], "demo")
+        self.assertEqual(
+            result["checks"]["deployment_profile"]["missing"],
+            ["NEON_DATABASE_URL", "DEMO_PUBLISH_TARGET_DATABASE_URL"],
+        )
+
+    def test_check_readiness_rejects_unknown_deployment_profile(self) -> None:
+        service = ReadinessService()
+
+        with patch.dict(
+            "os.environ",
+            {
+                "BTQ_DEPLOYMENT_PROFILE": "production",
+                "DATABASE_TARGET": "local",
+                "LOCAL_DATABASE_URL": "postgresql://postgres:secret@localhost:5432/btq",
+                "SEC_CONTACT_NAME": "BTQ Research",
+                "SEC_CONTACT_EMAIL": "you@example.com",
+            },
+            clear=True,
+        ):
+            result = service.check_readiness(include_database=False)
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["checks"]["deployment_profile"]["status"], "error")
+        self.assertEqual(result["checks"]["deployment_profile"]["allowed_profiles"], ["ci", "demo", "local"])
 
 
 if __name__ == "__main__":
