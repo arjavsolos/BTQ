@@ -115,6 +115,17 @@ def _render_benchmark_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _write_text_output(output_path: str, content: str) -> dict[str, Any]:
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return {
+        "status": "written",
+        "output_path": str(path),
+        "bytes_written": len(content.encode("utf-8")),
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="BTQ project runner")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -148,6 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--save", action="store_true")
     analyze.add_argument("--summary-only", action="store_true")
     analyze.add_argument("--format", choices=["json", "markdown"], default="json")
+    analyze.add_argument("--output-path", help="Write the rendered analysis output to a file")
 
     build_dataset = subparsers.add_parser(
         "build-historical-dataset",
@@ -297,10 +309,18 @@ def main() -> None:
             save_to_db=args.save,
         )
         if args.format == "markdown":
-            print(render_trial_analysis_markdown(result))
+            rendered = render_trial_analysis_markdown(result)
+            if args.output_path:
+                print(json.dumps(_write_text_output(args.output_path, rendered), indent=2, ensure_ascii=True))
+                return
+            print(rendered)
             return
         payload = result["summary"] if args.summary_only else result
-        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        rendered = json.dumps(payload, indent=2, ensure_ascii=True)
+        if args.output_path:
+            print(json.dumps(_write_text_output(args.output_path, rendered), indent=2, ensure_ascii=True))
+            return
+        print(rendered)
         return
 
     if args.command == "build-historical-dataset":

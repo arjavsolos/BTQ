@@ -52,3 +52,11 @@ Apply the copy to the configured demo database:
 ```bash
 python run.py publish-demo-dataset --apply
 ```
+
+## Analysis Reports
+
+Generate a shareable Markdown report for a trial analysis:
+
+```bash
+python run.py analyze-trial NCT00000001 --format markdown --output-path reports/NCT00000001.md
+```

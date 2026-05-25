@@ -3,8 +3,10 @@ from __future__ import annotations
 import io
 import json
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 import run
@@ -553,6 +555,41 @@ class RunParserTests(unittest.TestCase):
                 "save_to_db": False,
             },
         )
+
+    def test_main_writes_trial_analysis_markdown_report_to_file(self) -> None:
+        service = _TrialAnalysisServiceStub()
+        stdout = io.StringIO()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "reports" / "NCT00000001.md"
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "run.py",
+                        "analyze-trial",
+                        "NCT00000001",
+                        "--format",
+                        "markdown",
+                        "--output-path",
+                        str(output_path),
+                    ],
+                ),
+                patch("run.TrialAnalysisService", return_value=service),
+                redirect_stdout(stdout),
+            ):
+                run.main()
+
+            payload = json.loads(stdout.getvalue())
+            written_report = output_path.read_text(encoding="utf-8")
+
+        self.assertEqual(payload["status"], "written")
+        self.assertEqual(payload["output_path"], str(output_path))
+        self.assertGreater(payload["bytes_written"], 100)
+        self.assertIn("# Trial Analysis Report", written_report)
+        self.assertIn("Observed market reaction was stronger than historical expectation.", written_report)
+        self.assertEqual(service.calls[0]["nct_id"], "NCT00000001")
 
     def test_main_exports_historical_events_with_summary(self) -> None:
         repository = _HistoricalEventRepositoryStub(
