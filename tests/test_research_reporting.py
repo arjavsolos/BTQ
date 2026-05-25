@@ -46,6 +46,12 @@ class ResearchReportingTests(unittest.TestCase):
                     "return_gap": 0.043,
                     "confidence_notes": [],
                 },
+                "analysis_readiness": {
+                    "status": "production_ready",
+                    "score": 96,
+                    "blockers": [],
+                    "cautions": ["manual_review_available"],
+                },
                 "warnings": [],
             }
         )
@@ -54,6 +60,9 @@ class ResearchReportingTests(unittest.TestCase):
         self.assertIn("Observed market reaction was stronger than historical expectation.", markdown)
         self.assertIn("**Mapped ticker:** `PFE`", markdown)
         self.assertIn("**Classification:** `stronger_than_expected`", markdown)
+        self.assertIn("## Production Readiness", markdown)
+        self.assertIn("**Readiness status:** `production_ready`", markdown)
+        self.assertIn("**Readiness score:** `96`", markdown)
         self.assertIn("**Quality tier:** `high`", markdown)
 
 

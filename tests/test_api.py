@@ -36,6 +36,12 @@ class _TrialAnalysisServiceStub:
             "status": "success",
             "summary": {
                 "nct_id": nct_id,
+                "analysis_readiness": {
+                    "status": "production_ready",
+                    "score": 96,
+                    "blockers": [],
+                    "cautions": [],
+                },
                 "expected_reaction_status": "available",
                 "expected_reaction_profile": {
                     "expected_direction": "positive",
@@ -89,6 +95,7 @@ class ApiRouteTests(unittest.TestCase):
 
         self.assertEqual(response["status"], "success")
         self.assertEqual(response["request"]["nct_id"], "NCT00000001")
+        self.assertEqual(response["summary"]["analysis_readiness"]["status"], "production_ready")
         self.assertEqual(response["summary"]["expected_reaction_status"], "available")
         self.assertEqual(response["summary"]["expected_reaction_profile"]["expected_direction"], "positive")
         self.assertEqual(

@@ -451,6 +451,80 @@ class TrialAnalysisService:
             "confidence_notes": confidence_notes,
         }
 
+    def _build_analysis_readiness(
+        self,
+        trial: dict[str, Any],
+        sponsor_mapping: dict[str, Any] | None,
+        market_summary: dict[str, Any] | None,
+        expected_reaction_context: dict[str, Any],
+        market_expected_reaction_comparison: dict[str, Any],
+        warnings: list[str],
+        save_requested: bool,
+        persistence: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        score = 100
+        blockers: list[str] = []
+        cautions: list[str] = []
+
+        event_date_quality = self._build_event_date_quality_summary(trial)
+        if event_date_quality.get("quality_tier") not in {"high", "moderate"}:
+            score -= 25
+            blockers.append("event_date_not_market_usable")
+        elif event_date_quality.get("quality_tier") == "moderate":
+            score -= 10
+            cautions.append("event_date_quality_is_moderate")
+
+        if not (sponsor_mapping or {}).get("ticker"):
+            score -= 25
+            blockers.append("missing_public_ticker_mapping")
+        if not market_summary or market_summary.get("error"):
+            score -= 25
+            blockers.append("missing_market_reaction")
+        if expected_reaction_context.get("status") != "available" or not expected_reaction_context.get("profile"):
+            score -= 20
+            blockers.append("missing_expected_reaction_profile")
+        if market_expected_reaction_comparison.get("status") != "available":
+            score -= 15
+            cautions.append("actual_vs_expected_comparison_unavailable")
+        if warnings:
+            score -= min(15, len(warnings) * 3)
+            cautions.append("analysis_returned_warnings")
+        if save_requested and not (persistence or {}).get("saved"):
+            score -= 10
+            cautions.append("persistence_not_confirmed")
+
+        score = max(0, min(100, score))
+        if blockers:
+            status = "blocked"
+        elif score >= 85:
+            status = "production_ready"
+        elif score >= 60:
+            status = "review_recommended"
+        else:
+            status = "blocked"
+
+        return {
+            "status": status,
+            "score": score,
+            "blockers": blockers,
+            "cautions": cautions,
+            "checks": {
+                "event_date_quality_tier": event_date_quality.get("quality_tier"),
+                "has_public_ticker": bool((sponsor_mapping or {}).get("ticker")),
+                "has_market_reaction": bool(market_summary and not market_summary.get("error")),
+                "has_expected_reaction_profile": bool(expected_reaction_context.get("profile")),
+                "has_actual_vs_expected_comparison": market_expected_reaction_comparison.get("status")
+                == "available",
+                "persistence": (
+                    "saved"
+                    if (persistence or {}).get("saved")
+                    else "not_requested"
+                    if not save_requested
+                    else "not_saved"
+                ),
+            },
+        }
+
     def _persist_analysis(self, trial: dict[str, Any], analysis: dict[str, Any]) -> dict[str, int] | None:
         try:
             with get_connection() as connection:
@@ -568,16 +642,17 @@ class TrialAnalysisService:
             "final_comparison_summary": final_comparison_summary,
             "warnings": warnings,
         }
+        persistence: dict[str, Any] | None = None
         if save_to_db:
             persistence_ids = self._persist_analysis(trial, analysis)
             if persistence_ids is not None:
-                analysis["persistence"] = {
+                persistence = {
                     "saved": True,
                     "analysis_id": persistence_ids["analysis_id"],
                     "historical_event_id": persistence_ids["historical_event_id"],
                 }
             else:
-                analysis["persistence"] = {
+                persistence = {
                     "saved": False,
                     "analysis_id": None,
                     "historical_event_id": None,
@@ -589,6 +664,19 @@ class TrialAnalysisService:
                         "or not configured."
                     ]
                 )
+            analysis["persistence"] = persistence
+        analysis_readiness = self._build_analysis_readiness(
+            trial=trial,
+            sponsor_mapping=sponsor_mapping,
+            market_summary=market_summary,
+            expected_reaction_context=expected_reaction_context,
+            market_expected_reaction_comparison=market_expected_reaction_comparison,
+            warnings=analysis["warnings"],
+            save_requested=save_to_db,
+            persistence=persistence,
+        )
+        analysis["analysis_readiness"] = analysis_readiness
+        analysis["summary"]["analysis_readiness"] = analysis_readiness
         return analysis
 
 

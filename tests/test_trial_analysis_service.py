@@ -217,6 +217,10 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertFalse(result["event_date_review"]["queued"])
         self.assertEqual(result["fda_context"]["approval_record_count"], 1)
         self.assertEqual(result["market_data"]["event_day_return"], 0.123)
+        self.assertEqual(result["analysis_readiness"]["status"], "production_ready")
+        self.assertEqual(result["analysis_readiness"]["score"], 100)
+        self.assertEqual(result["analysis_readiness"]["blockers"], [])
+        self.assertEqual(result["summary"]["analysis_readiness"]["status"], "production_ready")
         self.assertEqual(result["warnings"], [])
 
     def test_analyze_trial_attaches_expected_reaction_context(self) -> None:
@@ -431,6 +435,10 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             result["final_comparison_summary"]["headline"],
             "Insufficient data to compare observed market reaction with historical expectation.",
         )
+        self.assertEqual(result["analysis_readiness"]["status"], "blocked")
+        self.assertIn("event_date_not_market_usable", result["analysis_readiness"]["blockers"])
+        self.assertIn("missing_market_reaction", result["analysis_readiness"]["blockers"])
+        self.assertIn("analysis_returned_warnings", result["analysis_readiness"]["cautions"])
         self.assertIn(
             "Event-date quality weakens the reliability of the comparison.",
             result["final_comparison_summary"]["confidence_notes"],

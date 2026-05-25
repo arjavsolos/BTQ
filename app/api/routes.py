@@ -6,6 +6,7 @@ from app.api.schemas import TrialAnalysisRequest
 from app.services import TrialAnalysisService
 
 FINAL_COMPARISON_FIELDS = {
+    "analysis_readiness",
     "expected_reaction_status",
     "expected_reaction_profile",
     "market_expected_reaction_comparison",

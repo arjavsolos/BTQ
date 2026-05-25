@@ -31,6 +31,7 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         or {}
     )
     event_date_quality = analysis.get("event_date_quality") or summary.get("event_date_quality") or {}
+    analysis_readiness = analysis.get("analysis_readiness") or summary.get("analysis_readiness") or {}
     warnings = analysis.get("warnings") or []
 
     lines = [
@@ -45,6 +46,13 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         _bullet("Expected-reaction confidence", final_summary.get("expected_reaction_confidence")),
         _bullet("Event-date quality", final_summary.get("event_date_quality_tier")),
         _bullet("Return gap", final_summary.get("return_gap")),
+        "",
+        "## Production Readiness",
+        "",
+        _bullet("Readiness status", analysis_readiness.get("status")),
+        _bullet("Readiness score", analysis_readiness.get("score")),
+        _bullet("Blockers", ", ".join(analysis_readiness.get("blockers") or [])),
+        _bullet("Cautions", ", ".join(analysis_readiness.get("cautions") or [])),
         "",
         "## Trial",
         "",
