@@ -28,6 +28,7 @@ from app.ingestion import (
 from app.services.event_date_quality_service import EventDateQualityService
 from app.services.event_date_review_service import EventDateReviewService
 from app.services.event_return_benchmark_service import EventReturnBenchmarkService
+from app.services.baseline_model_service import BaselineModelService
 from app.services.historical_trial_event_service import HistoricalTrialEventService
 from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
@@ -50,6 +51,7 @@ class TrialAnalysisService:
         sponsor_mapping_review_service: SponsorMappingReviewService | None = None,
         event_date_review_service: EventDateReviewService | None = None,
         expected_reaction_benchmark_service: EventReturnBenchmarkService | None = None,
+        baseline_model_service: BaselineModelService | None = None,
         persist_trial_records: bool = True,
     ) -> None:
         self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
@@ -63,6 +65,7 @@ class TrialAnalysisService:
         self.expected_reaction_benchmark_service = (
             expected_reaction_benchmark_service or EventReturnBenchmarkService()
         )
+        self.baseline_model_service = baseline_model_service or BaselineModelService()
         self.persist_trial_records = persist_trial_records
         self.event_date_quality_service = EventDateQualityService()
         self.historical_event_service = HistoricalTrialEventService()
@@ -575,6 +578,15 @@ class TrialAnalysisService:
             override_applied=event_date_override_applied,
         )
         warnings.extend(event_date_review_warnings)
+        baseline_probability = self.baseline_model_service.score_trial(
+            trial=trial,
+            sponsor_mapping=sponsor_mapping,
+        )
+        if baseline_probability.get("warnings"):
+            warnings.append(
+                "Baseline probability model used fallback values for: "
+                + ", ".join(baseline_probability.get("warnings") or [])
+            )
 
         approval_records, fda_warnings = self._fetch_fda_context(
             sponsor_name=trial.get("sponsor_name"),
@@ -611,6 +623,7 @@ class TrialAnalysisService:
         )
         summary["expected_reaction_status"] = expected_reaction_context.get("status")
         summary["expected_reaction_profile"] = expected_reaction_context.get("profile")
+        summary["modeled_success_probability"] = baseline_probability
         summary["market_expected_reaction_comparison"] = market_expected_reaction_comparison
         summary["final_comparison_summary"] = final_comparison_summary
 
@@ -630,6 +643,7 @@ class TrialAnalysisService:
             "summary": summary,
             "event_date_quality": self._build_event_date_quality_summary(trial),
             "event_date_review": event_date_review,
+            "modeled_success_probability": baseline_probability,
             "trial": trial,
             "sponsor_mapping": sponsor_mapping,
             "fda_context": {

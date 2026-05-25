@@ -52,6 +52,11 @@ class ResearchReportingTests(unittest.TestCase):
                     "blockers": [],
                     "cautions": ["manual_review_available"],
                 },
+                "modeled_success_probability": {
+                    "model_version": "baseline-logistic-v1",
+                    "probability_percent": 71.2,
+                    "probability_tier": "favorable",
+                },
                 "warnings": [],
             }
         )
@@ -63,6 +68,8 @@ class ResearchReportingTests(unittest.TestCase):
         self.assertIn("## Production Readiness", markdown)
         self.assertIn("**Readiness status:** `production_ready`", markdown)
         self.assertIn("**Readiness score:** `96`", markdown)
+        self.assertIn("## Modeled Success Probability", markdown)
+        self.assertIn("**Success probability:** `71.2`", markdown)
         self.assertIn("**Quality tier:** `high`", markdown)
 
 

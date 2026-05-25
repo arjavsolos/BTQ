@@ -12,9 +12,13 @@ class _ClinicalStub:
             "nct_id": nct_id,
             "brief_title": "Example Trial",
             "sponsor_name": "Pfizer Inc",
+            "sponsor_class": "industry",
             "phase_label": "PHASE3",
+            "phase_score": 3,
             "overall_status": "COMPLETED",
             "therapeutic_area": "Oncology",
+            "has_results": True,
+            "data_completeness_ratio": 0.9,
             "event_date_candidate": "2025-01-15",
             "event_date_source": "primary_completion_date",
             "event_date_source_rank": 4,
@@ -213,6 +217,9 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(result["summary"]["event_date_quality_tier"], "high")
         self.assertEqual(result["summary"]["event_date_quality"]["quality_score"], 95)
         self.assertTrue(result["summary"]["event_date_quality"]["is_market_usable"])
+        self.assertEqual(result["summary"]["modeled_success_probability"]["status"], "available")
+        self.assertGreater(result["summary"]["modeled_success_probability"]["success_probability"], 0.6)
+        self.assertEqual(result["modeled_success_probability"]["probability_tier"], "favorable")
         self.assertEqual(result["event_date_quality"]["quality_tier"], "high")
         self.assertFalse(result["event_date_review"]["queued"])
         self.assertEqual(result["fda_context"]["approval_record_count"], 1)

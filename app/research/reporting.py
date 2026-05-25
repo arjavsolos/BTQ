@@ -30,6 +30,11 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         or summary.get("expected_reaction_profile")
         or {}
     )
+    modeled_probability = (
+        analysis.get("modeled_success_probability")
+        or summary.get("modeled_success_probability")
+        or {}
+    )
     event_date_quality = analysis.get("event_date_quality") or summary.get("event_date_quality") or {}
     analysis_readiness = analysis.get("analysis_readiness") or summary.get("analysis_readiness") or {}
     warnings = analysis.get("warnings") or []
@@ -53,6 +58,12 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         _bullet("Readiness score", analysis_readiness.get("score")),
         _bullet("Blockers", ", ".join(analysis_readiness.get("blockers") or [])),
         _bullet("Cautions", ", ".join(analysis_readiness.get("cautions") or [])),
+        "",
+        "## Modeled Success Probability",
+        "",
+        _bullet("Model", modeled_probability.get("model_version")),
+        _bullet("Success probability", modeled_probability.get("probability_percent")),
+        _bullet("Probability tier", modeled_probability.get("probability_tier")),
         "",
         "## Trial",
         "",

@@ -4,6 +4,7 @@ from importlib import import_module
 from typing import Any
 
 __all__ = [
+    "BaselineModelService",
     "EventReturnBenchmarkService",
     "DemoDatasetPublisherService",
     "EventDateReviewService",
@@ -17,6 +18,7 @@ __all__ = [
 ]
 
 _SERVICE_MODULES = {
+    "BaselineModelService": "app.services.baseline_model_service",
     "EventReturnBenchmarkService": "app.services.event_return_benchmark_service",
     "DemoDatasetPublisherService": "app.services.demo_dataset_publisher_service",
     "EventDateReviewService": "app.services.event_date_review_service",
