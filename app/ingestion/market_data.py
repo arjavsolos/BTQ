@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Any
 import requests
 
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+TICKER_PATTERN = re.compile(r"^[A-Z][A-Z0-9.-]{0,14}$")
 
 
 @dataclass(slots=True)
@@ -37,7 +39,16 @@ class MarketDataIngestor:
         )
 
     def _parse_date(self, value: str) -> datetime:
-        return datetime.strptime(value, "%Y-%m-%d")
+        try:
+            return datetime.strptime(value, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError(f"Invalid date '{value}'. Expected YYYY-MM-DD.") from exc
+
+    def _normalize_ticker(self, ticker: str) -> str:
+        normalized = ticker.strip().upper()
+        if not TICKER_PATTERN.fullmatch(normalized):
+            raise ValueError(f"Invalid ticker '{ticker}'. Use 1-15 letters, numbers, dots, or hyphens.")
+        return normalized
 
     def _to_unix(self, value: datetime) -> int:
         return int(value.replace(tzinfo=UTC).timestamp())
@@ -80,8 +91,11 @@ class MarketDataIngestor:
         end_date: str,
         include_prepost: bool = False,
     ) -> list[dict[str, Any]]:
+        normalized_ticker = self._normalize_ticker(ticker)
         start_dt = self._parse_date(start_date)
         end_dt = self._parse_date(end_date) + timedelta(days=1)
+        if end_dt <= start_dt:
+            raise ValueError("end_date must be on or after start_date.")
         params = {
             "period1": self._to_unix(start_dt),
             "period2": self._to_unix(end_dt),
@@ -90,7 +104,11 @@ class MarketDataIngestor:
             "includePrePost": str(include_prepost).lower(),
             "events": "div,splits,capitalGains",
         }
-        response = self.session.get(YAHOO_CHART_URL.format(ticker=ticker), params=params, timeout=self.timeout)
+        response = self.session.get(
+            YAHOO_CHART_URL.format(ticker=normalized_ticker),
+            params=params,
+            timeout=self.timeout,
+        )
         response.raise_for_status()
         return self._extract_chart_rows(response.json())
 
@@ -112,18 +130,20 @@ class MarketDataIngestor:
         pre_days: int = 5,
         post_days: int = 5,
     ) -> dict[str, Any]:
+        normalized_ticker = self._normalize_ticker(ticker)
+        normalized_event_date = self._parse_date(event_date).strftime("%Y-%m-%d")
         records = self.fetch_event_window(
             EventWindow(
-                ticker=ticker,
-                event_date=event_date,
+                ticker=normalized_ticker,
+                event_date=normalized_event_date,
                 pre_days=pre_days,
                 post_days=post_days,
             )
         )
         if not records:
             return {
-                "ticker": ticker,
-                "event_date": event_date,
+                "ticker": normalized_ticker,
+                "event_date": normalized_event_date,
                 "record_count": 0,
                 "error": "No market data returned for event window.",
             }
@@ -132,7 +152,7 @@ class MarketDataIngestor:
         closes = [row["close"] for row in records]
         event_index = None
         for idx, trade_date in enumerate(trade_dates):
-            if trade_date >= event_date:
+            if trade_date >= normalized_event_date:
                 event_index = idx
                 break
         if event_index is None:
@@ -151,8 +171,9 @@ class MarketDataIngestor:
             post_window_return = round((latest_close - event_close) / event_close, 6)
 
         return {
-            "ticker": ticker,
-            "event_date": event_date,
+            "ticker": normalized_ticker,
+            "event_date": normalized_event_date,
+            "selected_trade_date": trade_dates[event_index],
             "record_count": len(records),
             "trade_start": trade_dates[0],
             "trade_end": trade_dates[-1],
@@ -204,7 +225,7 @@ def main() -> None:
             post_days=args.post_days,
         )
         if args.out:
-            ingestor.export_records(payload["records"], args.out, format=args.out_format)
+            ingestor.export_records(payload.get("records", []), args.out, format=args.out_format)
         print(json.dumps(payload, indent=2, ensure_ascii=True))
         return
 
