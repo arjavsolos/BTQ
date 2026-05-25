@@ -20,6 +20,7 @@ from app.database.repositories import (
 )
 from app.research import build_methodology_snapshot, render_methodology_markdown, render_trial_analysis_markdown
 from app.services import (
+    DemoDatasetPublisherService,
     EventReturnBenchmarkService,
     HistoricalDatasetAuditService,
     HistoricalDatasetBackfillService,
@@ -125,6 +126,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Check whether the local environment and database are ready",
     )
     readiness.add_argument("--skip-db", action="store_true")
+
+    publish_demo_dataset = subparsers.add_parser(
+        "publish-demo-dataset",
+        help="Publish a curated local historical-event subset to the demo database",
+    )
+    publish_demo_dataset.add_argument("--source-database-url")
+    publish_demo_dataset.add_argument("--target-database-url")
+    publish_demo_dataset.add_argument("--limit", type=int, default=50)
+    publish_demo_dataset.add_argument("--offset", type=int, default=0)
+    publish_demo_dataset.add_argument("--event-date-quality-tier", default="high")
+    publish_demo_dataset.add_argument("--min-event-date-quality-score", type=int, default=80)
+    publish_demo_dataset.add_argument("--apply", action="store_true")
 
     analyze = subparsers.add_parser("analyze-trial", help="Run end-to-end analysis for one NCT ID")
     analyze.add_argument("nct_id")
@@ -256,6 +269,20 @@ def main() -> None:
     if args.command == "check-readiness":
         service = ReadinessService()
         result = service.check_readiness(include_database=not args.skip_db)
+        print(json.dumps(result, indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "publish-demo-dataset":
+        service = DemoDatasetPublisherService()
+        result = service.publish_demo_dataset(
+            source_database_url=args.source_database_url,
+            target_database_url=args.target_database_url,
+            limit=args.limit,
+            offset=args.offset,
+            dry_run=not args.apply,
+            event_date_quality_tier=args.event_date_quality_tier,
+            min_event_date_quality_score=args.min_event_date_quality_score,
+        )
         print(json.dumps(result, indent=2, ensure_ascii=True))
         return
 

@@ -2,7 +2,9 @@ from app.database.connection import (
     DatabaseConfigError,
     check_database_connection,
     create_connection,
+    create_connection_for_url,
     get_connection,
+    get_connection_for_url,
     get_database_settings,
 )
 from app.database.repositories import (
@@ -21,7 +23,9 @@ __all__ = [
     "DatabaseConfigError",
     "check_database_connection",
     "create_connection",
+    "create_connection_for_url",
     "get_connection",
+    "get_connection_for_url",
     "get_database_settings",
     "initialize_database",
 ]

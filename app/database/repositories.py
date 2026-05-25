@@ -689,6 +689,66 @@ class HistoricalTrialEventRepository:
             row = cursor.fetchone()
         return int(row[0])
 
+    def _deserialize_event_value(self, column: str, value: Any) -> Any:
+        if column not in HISTORICAL_EVENT_JSON_FIELDS:
+            return value
+        if value is None:
+            return {} if column == "feature_payload" else []
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
+    def list_full_events_for_demo_publish(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        is_model_ready: bool = True,
+        event_date_quality_tier: str | None = None,
+        min_event_date_quality_score: int | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses = []
+        params: list[Any] = []
+
+        if is_model_ready:
+            clauses.append("is_model_ready = %s")
+            params.append(True)
+        if event_date_quality_tier:
+            clauses.append("event_date_quality_tier = %s")
+            params.append(event_date_quality_tier.strip().lower())
+        if min_event_date_quality_score is not None:
+            clauses.append("event_date_quality_score >= %s")
+            params.append(max(0, min_event_date_quality_score))
+
+        where_clause = ""
+        if clauses:
+            where_clause = "where " + " and ".join(clauses)
+
+        select_columns = ", ".join(HISTORICAL_EVENT_COLUMNS)
+        sql = f"""
+        select {select_columns}
+        from historical_trial_events
+        {where_clause}
+        order by
+            event_date_quality_score desc nulls last,
+            event_date_candidate desc nulls last,
+            nct_id asc
+        limit %s
+        offset %s;
+        """
+        params.extend([max(1, limit), max(0, offset)])
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+
+        return [
+            {
+                column: self._deserialize_event_value(column, row[index])
+                for index, column in enumerate(HISTORICAL_EVENT_COLUMNS)
+            }
+            for row in rows
+        ]
+
     def list_recent_events(self, limit: int = 100) -> list[dict[str, Any]]:
         sql = """
         select

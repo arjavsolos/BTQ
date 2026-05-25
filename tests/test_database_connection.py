@@ -3,7 +3,12 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from app.database.connection import get_database_settings, get_database_target, get_database_url
+from app.database.connection import (
+    create_connection_for_url,
+    get_database_settings,
+    get_database_target,
+    get_database_url,
+)
 
 
 class DatabaseConnectionTests(unittest.TestCase):
@@ -72,6 +77,38 @@ class DatabaseConnectionTests(unittest.TestCase):
 
         self.assertEqual(settings.database_target, "local")
         self.assertEqual(settings.database_url, "postgresql://postgres:password@localhost:5432/btq_local")
+
+    def test_create_connection_for_url_uses_explicit_database_url(self) -> None:
+        class DriverStub:
+            def __init__(self) -> None:
+                self.calls: list[dict] = []
+
+            def connect(self, database_url: str, **kwargs):
+                self.calls.append({"database_url": database_url, "kwargs": kwargs})
+
+                class ConnectionStub:
+                    autocommit = False
+
+                return ConnectionStub()
+
+        driver = DriverStub()
+
+        with patch("app.database.connection._import_postgres_driver", return_value=(driver, "psycopg")):
+            connection = create_connection_for_url(
+                "postgresql://postgres:password@localhost:5432/btq",
+                autocommit=True,
+                connect_timeout=3,
+                application_name="btq-test",
+            )
+
+        self.assertTrue(connection.autocommit)
+        self.assertEqual(
+            driver.calls[0],
+            {
+                "database_url": "postgresql://postgres:password@localhost:5432/btq",
+                "kwargs": {"connect_timeout": 3, "application_name": "btq-test"},
+            },
+        )
 
 
 if __name__ == "__main__":

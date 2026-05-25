@@ -178,6 +178,25 @@ def create_connection(autocommit: bool = False) -> Any:
     return connection
 
 
+def create_connection_for_url(
+    database_url: str,
+    autocommit: bool = False,
+    connect_timeout: int | None = None,
+    application_name: str | None = None,
+) -> Any:
+    driver, driver_name = _import_postgres_driver()
+    if driver_name == "pg8000":
+        raise DatabaseConfigError("Direct URL connections require psycopg or psycopg2.")
+
+    kwargs = {
+        "connect_timeout": connect_timeout or int(os.getenv("DATABASE_CONNECT_TIMEOUT", "15")),
+        "application_name": application_name or os.getenv("DATABASE_APPLICATION_NAME", "btq"),
+    }
+    connection = driver.connect(database_url, **kwargs)
+    connection.autocommit = autocommit
+    return connection
+
+
 def get_pool() -> Any:
     global _POOL
     if _POOL is not None:
@@ -229,6 +248,29 @@ def get_connection(autocommit: bool = False) -> Iterator[Any]:
         return
 
     connection = create_connection(autocommit=autocommit)
+    try:
+        yield connection
+        if not autocommit:
+            connection.commit()
+    except Exception:
+        if not autocommit:
+            connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+@contextmanager
+def get_connection_for_url(
+    database_url: str,
+    autocommit: bool = False,
+    application_name: str = "btq-demo-publisher",
+) -> Iterator[Any]:
+    connection = create_connection_for_url(
+        database_url=database_url,
+        autocommit=autocommit,
+        application_name=application_name,
+    )
     try:
         yield connection
         if not autocommit:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.database.repositories import HistoricalTrialEventRepository
+from app.database.repositories import HISTORICAL_EVENT_COLUMNS, HistoricalTrialEventRepository
 
 
 class _FakeCursor:
@@ -145,6 +145,86 @@ class HistoricalTrialEventRepositoryTests(unittest.TestCase):
         statement, params = connection.executed[0]
         self.assertNotIn("where", statement.lower())
         self.assertEqual(params, (10, 3))
+
+    def test_list_full_events_for_demo_publish_returns_upsert_ready_records(self) -> None:
+        connection = _FakeConnection()
+        connection.fetchall_results.append(
+            [
+                tuple(
+                    {
+                        "analysis_id": 7,
+                        "nct_id": "NCT00000001",
+                        "requested_nct_id": "NCT00000001",
+                        "brief_title": "Example Trial",
+                        "sponsor_name": "Pfizer Inc.",
+                        "sponsor_class": "industry",
+                        "overall_status": "COMPLETED",
+                        "phase_label": "PHASE3",
+                        "phase_score": 3,
+                        "study_type": "INTERVENTIONAL",
+                        "therapeutic_area": "Oncology",
+                        "enrollment_count": 100,
+                        "has_results": True,
+                        "data_completeness_score": 91,
+                        "data_completeness_ratio": 0.91,
+                        "event_date_candidate": "2025-01-15",
+                        "event_date_source": "primary_completion_date",
+                        "event_date_source_rank": 4,
+                        "event_date_precision": "day",
+                        "event_date_confidence": "high",
+                        "event_date_quality_score": 95,
+                        "event_date_quality_tier": "high",
+                        "event_date_review_status": None,
+                        "event_date_review_reason": None,
+                        "event_date_override_applied": False,
+                        "mapped_ticker": "PFE",
+                        "mapped_cik": "0000078003",
+                        "matched_company_name": "PFIZER INC",
+                        "mapping_confidence": 1.0,
+                        "mapping_match_type": "exact_normalized",
+                        "sponsor_mapping_review_status": None,
+                        "sponsor_mapping_reviewed_mapping_status": None,
+                        "sponsor_mapping_override_applied": False,
+                        "approval_record_count": 1,
+                        "approval_application_numbers": ["NDA000001"],
+                        "approval_brand_names": ["Example"],
+                        "approval_sponsor_names": ["Pfizer"],
+                        "market_record_count": 10,
+                        "trade_start": "2025-01-10",
+                        "trade_end": "2025-01-20",
+                        "prior_close": 40.0,
+                        "event_close": 42.0,
+                        "latest_close": 43.0,
+                        "event_day_return": 0.05,
+                        "post_window_return": 0.075,
+                        "warning_count": 0,
+                        "warnings": [],
+                        "is_model_ready": True,
+                        "dataset_version": "1.0",
+                        "source_analysis_version": "1.0",
+                        "feature_payload": {"trial_features": {"phase_label": "PHASE3"}},
+                    }[column]
+                    for column in HISTORICAL_EVENT_COLUMNS
+                )
+            ]
+        )
+        repository = HistoricalTrialEventRepository(connection)
+
+        events = repository.list_full_events_for_demo_publish(
+            limit=10,
+            offset=2,
+            event_date_quality_tier="High",
+            min_event_date_quality_score=80,
+        )
+
+        self.assertEqual(events[0]["nct_id"], "NCT00000001")
+        self.assertEqual(events[0]["approval_application_numbers"], ["NDA000001"])
+        self.assertEqual(events[0]["feature_payload"]["trial_features"]["phase_label"], "PHASE3")
+        statement, params = connection.executed[0]
+        self.assertIn("is_model_ready = %s", statement)
+        self.assertIn("event_date_quality_tier = %s", statement)
+        self.assertIn("event_date_quality_score >= %s", statement)
+        self.assertEqual(params, (True, "high", 80, 10, 2))
 
 
 if __name__ == "__main__":

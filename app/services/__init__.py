@@ -5,6 +5,7 @@ from typing import Any
 
 __all__ = [
     "EventReturnBenchmarkService",
+    "DemoDatasetPublisherService",
     "EventDateReviewService",
     "EventDateQualityService",
     "HistoricalDatasetAuditService",
@@ -17,6 +18,7 @@ __all__ = [
 
 _SERVICE_MODULES = {
     "EventReturnBenchmarkService": "app.services.event_return_benchmark_service",
+    "DemoDatasetPublisherService": "app.services.demo_dataset_publisher_service",
     "EventDateReviewService": "app.services.event_date_review_service",
     "EventDateQualityService": "app.services.event_date_quality_service",
     "HistoricalDatasetAuditService": "app.services.historical_dataset_audit_service",

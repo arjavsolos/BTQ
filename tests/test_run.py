@@ -143,6 +143,38 @@ class _ReadinessServiceStub:
         }
 
 
+class _DemoDatasetPublisherServiceStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def publish_demo_dataset(
+        self,
+        source_database_url: str | None = None,
+        target_database_url: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        dry_run: bool = True,
+        event_date_quality_tier: str | None = "high",
+        min_event_date_quality_score: int | None = 80,
+    ) -> dict:
+        self.calls.append(
+            {
+                "source_database_url": source_database_url,
+                "target_database_url": target_database_url,
+                "limit": limit,
+                "offset": offset,
+                "dry_run": dry_run,
+                "event_date_quality_tier": event_date_quality_tier,
+                "min_event_date_quality_score": min_event_date_quality_score,
+            }
+        )
+        return {
+            "status": "dry_run" if dry_run else "published",
+            "selected_event_count": 2,
+            "published_event_count": 0 if dry_run else 2,
+        }
+
+
 class _TrialAnalysisServiceStub:
     def __init__(self) -> None:
         self.calls: list[dict] = []
@@ -218,6 +250,37 @@ class RunParserTests(unittest.TestCase):
 
         self.assertEqual(args.command, "check-readiness")
         self.assertTrue(args.skip_db)
+
+    def test_build_parser_supports_demo_dataset_publish_command(self) -> None:
+        parser = run.build_parser()
+
+        args = parser.parse_args(
+            [
+                "publish-demo-dataset",
+                "--source-database-url",
+                "postgresql://local",
+                "--target-database-url",
+                "postgresql://demo",
+                "--limit",
+                "25",
+                "--offset",
+                "5",
+                "--event-date-quality-tier",
+                "moderate",
+                "--min-event-date-quality-score",
+                "70",
+                "--apply",
+            ]
+        )
+
+        self.assertEqual(args.command, "publish-demo-dataset")
+        self.assertEqual(args.source_database_url, "postgresql://local")
+        self.assertEqual(args.target_database_url, "postgresql://demo")
+        self.assertEqual(args.limit, 25)
+        self.assertEqual(args.offset, 5)
+        self.assertEqual(args.event_date_quality_tier, "moderate")
+        self.assertEqual(args.min_event_date_quality_score, 70)
+        self.assertTrue(args.apply)
 
     def test_build_parser_supports_sponsor_mapping_review_export_command(self) -> None:
         parser = run.build_parser()
@@ -405,6 +468,47 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["checks"]["database"]["status"], "skipped")
         self.assertEqual(service.calls[0], {"include_database": False})
+
+    def test_main_runs_demo_dataset_publish_in_dry_run_mode(self) -> None:
+        service = _DemoDatasetPublisherServiceStub()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "run.py",
+                    "publish-demo-dataset",
+                    "--limit",
+                    "25",
+                    "--offset",
+                    "5",
+                    "--event-date-quality-tier",
+                    "high",
+                    "--min-event-date-quality-score",
+                    "80",
+                ],
+            ),
+            patch("run.DemoDatasetPublisherService", return_value=service),
+            redirect_stdout(stdout),
+        ):
+            run.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "dry_run")
+        self.assertEqual(
+            service.calls[0],
+            {
+                "source_database_url": None,
+                "target_database_url": None,
+                "limit": 25,
+                "offset": 5,
+                "dry_run": True,
+                "event_date_quality_tier": "high",
+                "min_event_date_quality_score": 80,
+            },
+        )
 
     def test_main_renders_trial_analysis_markdown_report(self) -> None:
         service = _TrialAnalysisServiceStub()

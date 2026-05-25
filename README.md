@@ -38,3 +38,17 @@ For a quick dependency and configuration check without opening a database connec
 ```bash
 python run.py check-readiness --skip-db
 ```
+
+## Demo Publishing
+
+Preview the curated model-ready subset that would be published to a hosted demo database:
+
+```bash
+python run.py publish-demo-dataset
+```
+
+Apply the copy to the configured demo database:
+
+```bash
+python run.py publish-demo-dataset --apply
+```
