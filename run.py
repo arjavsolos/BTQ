@@ -18,7 +18,13 @@ from app.database.repositories import (
     SponsorMappingReviewRepository,
     initialize_database,
 )
-from app.research import build_methodology_snapshot, render_methodology_markdown, render_trial_analysis_markdown
+from app.research import (
+    build_methodology_snapshot,
+    build_product_status_snapshot,
+    render_methodology_markdown,
+    render_product_status_markdown,
+    render_trial_analysis_markdown,
+)
 from app.services import (
     DemoDatasetPublisherService,
     EventReturnBenchmarkService,
@@ -197,6 +203,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     describe_methodology.add_argument("--format", choices=["json", "markdown"], default="json")
 
+    project_status = subparsers.add_parser(
+        "project-status",
+        help="Print the final project capability and readiness snapshot",
+    )
+    project_status.add_argument("--format", choices=["json", "markdown"], default="json")
+
     export_sponsor_mapping_reviews = subparsers.add_parser(
         "export-sponsor-mapping-reviews",
         help="Export sponsor mapping review rows in JSON or JSONL format",
@@ -364,6 +376,13 @@ def main() -> None:
             print(render_methodology_markdown())
             return
         print(json.dumps(build_methodology_snapshot(), indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "project-status":
+        if args.format == "markdown":
+            print(render_product_status_markdown())
+            return
+        print(json.dumps(build_product_status_snapshot(), indent=2, ensure_ascii=True))
         return
 
     if args.command == "export-sponsor-mapping-reviews":

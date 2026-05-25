@@ -25,6 +25,12 @@ The canonical project definition lives in:
 - `docs/methodology.md`
 - `app/research/methodology.py`
 
+Print the current capability and production-readiness snapshot:
+
+```bash
+python run.py project-status --format markdown
+```
+
 ## Readiness Check
 
 Before running backfills or analysis workflows, verify the local environment:

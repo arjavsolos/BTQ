@@ -253,6 +253,14 @@ class RunParserTests(unittest.TestCase):
         self.assertEqual(args.command, "check-readiness")
         self.assertTrue(args.skip_db)
 
+    def test_build_parser_supports_project_status_command(self) -> None:
+        parser = run.build_parser()
+
+        args = parser.parse_args(["project-status", "--format", "markdown"])
+
+        self.assertEqual(args.command, "project-status")
+        self.assertEqual(args.format, "markdown")
+
     def test_build_parser_supports_demo_dataset_publish_command(self) -> None:
         parser = run.build_parser()
 
@@ -511,6 +519,20 @@ class RunParserTests(unittest.TestCase):
                 "min_event_date_quality_score": 80,
             },
         )
+
+    def test_main_prints_project_status_markdown(self) -> None:
+        stdout = io.StringIO()
+
+        with (
+            patch.object(sys, "argv", ["run.py", "project-status", "--format", "markdown"]),
+            redirect_stdout(stdout),
+        ):
+            run.main()
+
+        output = stdout.getvalue()
+        self.assertIn("# BTQ Project Status", output)
+        self.assertIn("modeled_success_probability", output)
+        self.assertIn("## Demo Commands", output)
 
     def test_main_renders_trial_analysis_markdown_report(self) -> None:
         service = _TrialAnalysisServiceStub()
