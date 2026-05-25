@@ -39,6 +39,8 @@ For a quick dependency and configuration check without opening a database connec
 python run.py check-readiness --skip-db
 ```
 
+The API registry also exposes a lightweight health route that runs the same fast readiness check without touching the database by default.
+
 ## Demo Publishing
 
 Preview the curated model-ready subset that would be published to a hosted demo database:

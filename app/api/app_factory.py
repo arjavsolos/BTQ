@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.api.routes import analyze_trial_route
+from app.api.routes import analyze_trial_route, health_route
 
 
 def create_app() -> dict[str, Any]:
@@ -10,5 +10,6 @@ def create_app() -> dict[str, Any]:
         "name": "btq-api",
         "routes": {
             "analyze_trial": analyze_trial_route,
+            "health": health_route,
         },
     }

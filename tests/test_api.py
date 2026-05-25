@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.api import TrialAnalysisRequest, analyze_trial_route, create_app
+from app.api import TrialAnalysisRequest, analyze_trial_route, create_app, health_route
 
 
 class _TrialAnalysisServiceStub:
@@ -54,6 +54,21 @@ class _TrialAnalysisServiceStub:
                 "final_comparison_summary": final_summary,
             },
             "final_comparison_summary": final_summary,
+        }
+
+
+class _ReadinessServiceStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def check_readiness(self, include_database: bool = True) -> dict:
+        self.calls.append({"include_database": include_database})
+        return {
+            "status": "ok",
+            "checks": {
+                "python": {"status": "ok"},
+                "database": {"status": "skipped" if not include_database else "ok"},
+            },
         }
 
 
@@ -126,11 +141,32 @@ class ApiRouteTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             analyze_trial_route({"nct_id": "NCT00000001"}, service=IncompleteService())
 
+    def test_health_route_runs_fast_readiness_check_by_default(self) -> None:
+        service = _ReadinessServiceStub()
+
+        response = health_route(service=service)
+
+        self.assertEqual(response["status"], "ok")
+        self.assertEqual(response["service"], "btq-api")
+        self.assertFalse(response["include_database"])
+        self.assertEqual(response["readiness"]["checks"]["database"]["status"], "skipped")
+        self.assertEqual(service.calls[0], {"include_database": False})
+
+    def test_health_route_can_include_database_check(self) -> None:
+        service = _ReadinessServiceStub()
+
+        response = health_route(include_database=True, service=service)
+
+        self.assertTrue(response["include_database"])
+        self.assertEqual(response["readiness"]["checks"]["database"]["status"], "ok")
+        self.assertEqual(service.calls[0], {"include_database": True})
+
     def test_create_app_exposes_route_registry(self) -> None:
         app = create_app()
 
         self.assertEqual(app["name"], "btq-api")
         self.assertIs(app["routes"]["analyze_trial"], analyze_trial_route)
+        self.assertIs(app["routes"]["health"], health_route)
 
 
 if __name__ == "__main__":

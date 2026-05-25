@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.schemas import TrialAnalysisRequest
-from app.services import TrialAnalysisService
+from app.services import ReadinessService, TrialAnalysisService
 
 FINAL_COMPARISON_FIELDS = {
     "analysis_readiness",
@@ -22,6 +22,19 @@ def _validate_summary_contract(summary: dict[str, Any]) -> None:
     missing_fields = sorted(field for field in FINAL_COMPARISON_FIELDS if field not in summary)
     if missing_fields:
         raise ValueError(f"Trial analysis summary is missing final comparison fields: {missing_fields}")
+
+
+def health_route(
+    include_database: bool = False,
+    service: ReadinessService | None = None,
+) -> dict[str, Any]:
+    readiness = (service or ReadinessService()).check_readiness(include_database=include_database)
+    return {
+        "status": readiness.get("status", "unknown"),
+        "service": "btq-api",
+        "include_database": include_database,
+        "readiness": readiness,
+    }
 
 
 def analyze_trial_route(
