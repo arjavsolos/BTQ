@@ -36,6 +36,7 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         or {}
     )
     bayesian_probability = analysis.get("bayesian_probability") or summary.get("bayesian_probability") or {}
+    event_risk_simulation = analysis.get("event_risk_simulation") or summary.get("event_risk_simulation") or {}
     event_date_quality = analysis.get("event_date_quality") or summary.get("event_date_quality") or {}
     analysis_readiness = analysis.get("analysis_readiness") or summary.get("analysis_readiness") or {}
     warnings = analysis.get("warnings") or []
@@ -67,6 +68,22 @@ def render_trial_analysis_markdown(analysis: dict[str, Any]) -> str:
         _bullet("Probability tier", modeled_probability.get("probability_tier")),
         _bullet("Bayesian posterior", bayesian_probability.get("posterior_probability_percent")),
         _bullet("Bayesian confidence", bayesian_probability.get("confidence_tier")),
+        "",
+        "## Monte Carlo Event Risk",
+        "",
+        _bullet("Simulation status", event_risk_simulation.get("status")),
+        _bullet("Simulation count", event_risk_simulation.get("simulation_count")),
+        _bullet("Probability source", event_risk_simulation.get("probability_source")),
+        _bullet("Expected event-day return", event_risk_simulation.get("expected_event_day_return")),
+        _bullet("Expected post-window return", event_risk_simulation.get("expected_post_window_return")),
+        _bullet("Downside probability", event_risk_simulation.get("downside_probability")),
+        _bullet(
+            "Bear / base / bull",
+            ", ".join(
+                f"{item.get('scenario')}={item.get('event_day_return')}"
+                for item in event_risk_simulation.get("scenario_table") or []
+            ),
+        ),
         "",
         "## Trial",
         "",

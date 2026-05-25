@@ -227,6 +227,34 @@ class _TrialAnalysisServiceStub:
                     "posterior_probability_percent": 68.4,
                     "confidence_tier": "moderate",
                 },
+                "event_risk_simulation": {
+                    "status": "available",
+                    "simulation_count": 5000,
+                    "probability_source": "bayesian_posterior",
+                    "expected_event_day_return": 0.071,
+                    "expected_post_window_return": 0.028,
+                    "downside_probability": 0.31,
+                    "scenario_table": [
+                        {"scenario": "bear", "event_day_return": -0.051},
+                        {"scenario": "base", "event_day_return": 0.066},
+                        {"scenario": "bull", "event_day_return": 0.171},
+                    ],
+                },
+                "analysis_readiness": {
+                    "status": "production_ready",
+                    "score": 96,
+                    "blockers": [],
+                    "cautions": [],
+                },
+                "expected_reaction_status": "available",
+                "expected_reaction_profile": {
+                    "expected_direction": "positive",
+                    "confidence_tier": "moderate",
+                },
+                "market_expected_reaction_comparison": {
+                    "classification": "stronger_than_expected",
+                    "return_gap": 0.043,
+                },
                 "final_comparison_summary": final_summary,
             },
             "event_date_quality": {

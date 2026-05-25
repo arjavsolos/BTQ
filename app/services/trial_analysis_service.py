@@ -31,6 +31,7 @@ from app.services.event_return_benchmark_service import EventReturnBenchmarkServ
 from app.services.baseline_model_service import BaselineModelService
 from app.services.bayesian_probability_service import BayesianProbabilityService
 from app.services.historical_trial_event_service import HistoricalTrialEventService
+from app.services.monte_carlo_risk_service import MonteCarloRiskService
 from app.services.sponsor_mapping_review_service import SponsorMappingReviewService
 
 
@@ -54,6 +55,7 @@ class TrialAnalysisService:
         expected_reaction_benchmark_service: EventReturnBenchmarkService | None = None,
         baseline_model_service: BaselineModelService | None = None,
         bayesian_probability_service: BayesianProbabilityService | None = None,
+        monte_carlo_risk_service: MonteCarloRiskService | None = None,
         persist_trial_records: bool = True,
     ) -> None:
         self.clinical_trials_ingestor = clinical_trials_ingestor or ClinicalTrialsIngestor()
@@ -69,6 +71,7 @@ class TrialAnalysisService:
         )
         self.baseline_model_service = baseline_model_service or BaselineModelService()
         self.bayesian_probability_service = bayesian_probability_service or BayesianProbabilityService()
+        self.monte_carlo_risk_service = monte_carlo_risk_service or MonteCarloRiskService()
         self.persist_trial_records = persist_trial_records
         self.event_date_quality_service = EventDateQualityService()
         self.historical_event_service = HistoricalTrialEventService()
@@ -623,6 +626,18 @@ class TrialAnalysisService:
             market_summary=market_summary,
             expected_reaction_context=expected_reaction_context,
         )
+        event_risk_simulation = self.monte_carlo_risk_service.simulate_trial_event_risk(
+            trial=trial,
+            baseline_probability=baseline_probability,
+            bayesian_probability=bayesian_probability,
+            expected_reaction_context=expected_reaction_context,
+            market_summary=market_summary,
+        )
+        if event_risk_simulation.get("warnings"):
+            warnings.append(
+                "Monte Carlo event-risk simulation returned warnings: "
+                + ", ".join(event_risk_simulation.get("warnings") or [])
+            )
         final_comparison_summary = self._build_final_comparison_summary(
             trial=trial,
             expected_reaction_context=expected_reaction_context,
@@ -639,6 +654,7 @@ class TrialAnalysisService:
         summary["expected_reaction_profile"] = expected_reaction_context.get("profile")
         summary["modeled_success_probability"] = baseline_probability
         summary["bayesian_probability"] = bayesian_probability
+        summary["event_risk_simulation"] = event_risk_simulation
         summary["market_expected_reaction_comparison"] = market_expected_reaction_comparison
         summary["final_comparison_summary"] = final_comparison_summary
 
@@ -660,6 +676,7 @@ class TrialAnalysisService:
             "event_date_review": event_date_review,
             "modeled_success_probability": baseline_probability,
             "bayesian_probability": bayesian_probability,
+            "event_risk_simulation": event_risk_simulation,
             "trial": trial,
             "sponsor_mapping": sponsor_mapping,
             "fda_context": {

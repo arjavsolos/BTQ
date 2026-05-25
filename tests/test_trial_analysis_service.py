@@ -228,9 +228,50 @@ class _BayesianProbabilityStub:
         }
 
 
+class _MonteCarloRiskStub:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def simulate_trial_event_risk(
+        self,
+        trial: dict,
+        baseline_probability: dict | None = None,
+        bayesian_probability: dict | None = None,
+        expected_reaction_context: dict | None = None,
+        market_summary: dict | None = None,
+        simulation_count: int = 5000,
+    ) -> dict:
+        self.calls.append(
+            {
+                "trial": dict(trial),
+                "baseline_probability": baseline_probability,
+                "bayesian_probability": bayesian_probability,
+                "expected_reaction_context": expected_reaction_context,
+                "market_summary": market_summary,
+                "simulation_count": simulation_count,
+            }
+        )
+        return {
+            "status": "available",
+            "model_version": "event-risk-monte-carlo-v1",
+            "simulation_count": simulation_count,
+            "probability_source": "bayesian_posterior",
+            "expected_event_day_return": 0.071,
+            "expected_post_window_return": 0.028,
+            "downside_probability": 0.31,
+            "scenario_table": [
+                {"scenario": "bear", "event_day_return": -0.051},
+                {"scenario": "base", "event_day_return": 0.066},
+                {"scenario": "bull", "event_day_return": 0.171},
+            ],
+            "warnings": [],
+        }
+
+
 class TrialAnalysisServiceTests(unittest.TestCase):
     def test_analyze_trial_returns_joined_output(self) -> None:
         bayesian_stub = _BayesianProbabilityStub()
+        monte_carlo_stub = _MonteCarloRiskStub()
         service = TrialAnalysisService(
             clinical_trials_ingestor=_ClinicalStub(),
             sec_mapper=_SecStub(),
@@ -240,6 +281,7 @@ class TrialAnalysisServiceTests(unittest.TestCase):
             event_date_review_service=_EventDateReviewStub(),
             expected_reaction_benchmark_service=_ExpectedReactionBenchmarkStub(),
             bayesian_probability_service=bayesian_stub,
+            monte_carlo_risk_service=monte_carlo_stub,
         )
 
         result = service.analyze_trial("NCT00000001")
@@ -255,10 +297,16 @@ class TrialAnalysisServiceTests(unittest.TestCase):
         self.assertGreater(result["summary"]["modeled_success_probability"]["success_probability"], 0.6)
         self.assertEqual(result["modeled_success_probability"]["probability_tier"], "favorable")
         self.assertEqual(result["summary"]["bayesian_probability"]["posterior_probability_percent"], 68.4)
+        self.assertEqual(result["summary"]["event_risk_simulation"]["expected_event_day_return"], 0.071)
+        self.assertEqual(result["event_risk_simulation"]["downside_probability"], 0.31)
         self.assertEqual(result["bayesian_probability"]["confidence_tier"], "moderate")
         self.assertEqual(
             bayesian_stub.calls[0]["baseline_probability"],
             result["modeled_success_probability"]["success_probability"],
+        )
+        self.assertEqual(
+            monte_carlo_stub.calls[0]["bayesian_probability"]["posterior_probability"],
+            0.684,
         )
         self.assertEqual(result["event_date_quality"]["quality_tier"], "high")
         self.assertFalse(result["event_date_review"]["queued"])

@@ -47,6 +47,13 @@ class _TrialAnalysisServiceStub:
                     "posterior_probability_percent": 68.4,
                     "confidence_tier": "moderate",
                 },
+                "event_risk_simulation": {
+                    "status": "available",
+                    "simulation_count": 5000,
+                    "probability_source": "bayesian_posterior",
+                    "expected_event_day_return": 0.071,
+                    "downside_probability": 0.31,
+                },
                 "expected_reaction_status": "available",
                 "expected_reaction_profile": {
                     "expected_direction": "positive",
@@ -117,6 +124,7 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(response["request"]["nct_id"], "NCT00000001")
         self.assertEqual(response["summary"]["analysis_readiness"]["status"], "production_ready")
         self.assertEqual(response["summary"]["bayesian_probability"]["posterior_probability_percent"], 68.4)
+        self.assertEqual(response["summary"]["event_risk_simulation"]["simulation_count"], 5000)
         self.assertEqual(response["summary"]["expected_reaction_status"], "available")
         self.assertEqual(response["summary"]["expected_reaction_profile"]["expected_direction"], "positive")
         self.assertEqual(
